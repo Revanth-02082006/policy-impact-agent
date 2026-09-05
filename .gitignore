@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Environment and Secrets
+.env
+.env.*
+!.env.example
+
+# Build Outputs
+dist/
+build/
+client/dist/
+server/dist/
+
+# Firebase & IDE Cache
+.firebase/
+.firebaserc.bak
+.DS_Store
+*.log
+Thumbs.db
