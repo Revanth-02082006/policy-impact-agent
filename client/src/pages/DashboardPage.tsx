@@ -20,9 +20,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ currentSimulation 
         </div>
 
         <div className="relative z-10 max-w-3xl">
-          <span className="inline-flex items-center space-x-1.5 bg-blue-500/30 text-blue-200 border border-blue-400/30 text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider mb-4">
-            <span>{currentSimulation?.input.location || 'Municipal Policy Administration'}</span>
-          </span>
           <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white mb-2">
             Policy Impact Agent
           </h1>
