@@ -19,7 +19,7 @@ import {
   FrictionClassification,
   getGainClassification,
   getFrictionClassification,
-} from './types.js';
+} from '../types/index.js';
 
 export const MANDATORY_DISCLAIMER =
   'This platform provides AI-assisted simulations for decision support only. Results are based on available information, assumptions, and heuristic reasoning. Final decisions should be made by qualified government authorities using official data and expert evaluation.';
@@ -5798,5 +5798,3 @@ function determineUrgency(description: string): 'Low' | 'Standard' | 'Urgent' | 
   }
   return 'Standard';
 }
-
-export const generateFallbackResult = generateGenericFallbackResult;

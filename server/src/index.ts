@@ -62,7 +62,25 @@ app.get('/api/infrastructure', async (req, res) => {
 // Primary simulation route
 app.post('/api/simulate', async (req, res) => {
   try {
-    const { description, location, district, area, locationName, latitude, longitude, selectedAsset, selectedAssetId, selectedAssetSource, duration, reason, department, constraints } = req.body;
+    const {
+      description,
+      location,
+      district,
+      city,
+      town,
+      village,
+      area,
+      locationName,
+      latitude,
+      longitude,
+      selectedAsset,
+      selectedAssetId,
+      selectedAssetSource,
+      duration,
+      reason,
+      department,
+      constraints
+    } = req.body;
 
     if (!description || typeof description !== 'string' || description.trim() === '') {
       return res.status(400).json({ error: 'Description is required in natural language.' });
@@ -74,6 +92,9 @@ app.post('/api/simulate', async (req, res) => {
       description,
       location,
       district,
+      city,
+      town,
+      village,
       area,
       locationName,
       latitude,

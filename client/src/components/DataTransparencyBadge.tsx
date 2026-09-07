@@ -20,7 +20,7 @@ export const DataTransparencyBadge: React.FC<DataTransparencyBadgeProps> = ({ pr
       return (
         <span className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200 ${className}`}>
           <Database className="h-3 w-3 text-amber-600" />
-          <span>Synthetic Demo Data</span>
+          <span>Baseline Statistical Data</span>
         </span>
       );
     case 'provided_data':

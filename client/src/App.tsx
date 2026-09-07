@@ -7,6 +7,7 @@ import { SimulationResultsPage } from './pages/SimulationResultsPage.js';
 import { ReportPage } from './pages/ReportPage.js';
 import { SimulationResult, ScenarioInput } from './types/index.js';
 import { fetchHealth, runSimulation } from './services/api.js';
+import { generateClientSimulation } from './services/simulationEngine.js';
 
 export const App: React.FC = () => {
   const [simulation, setSimulation] = useState<SimulationResult | null>(null);

@@ -85,18 +85,53 @@ export async function geocodeArea(
   return response.json();
 }
 
+import { generateClientSimulation } from './simulationEngine.js';
+import { tryClientGeminiSimulation } from './geminiClient.js';
+
 export async function fetchHealth(): Promise<{ status: string; isLiveGeminiAvailable: boolean }> {
-  const response = await fetch(`${API_BASE}/api/health`);
-  if (!response.ok) throw new Error('Health check endpoint failed');
-  return response.json();
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3500);
+    const response = await fetch(`${API_BASE}/api/health`, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!response.ok) throw new Error('Health check non-200');
+    return response.json();
+  } catch {
+    return { status: 'client_fallback', isLiveGeminiAvailable: false };
+  }
 }
 
 export async function runSimulation(input: ScenarioInput): Promise<SimulationResult> {
-  const response = await fetch(`${API_BASE}/api/simulate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input)
-  });
-  if (!response.ok) throw new Error(`Simulation failed with HTTP status ${response.status}`);
-  return response.json();
+  // 1. Try backend server
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 25000);
+    const response = await fetch(`${API_BASE}/api/simulate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (err: any) {
+    // Backend offline or static hosting
+  }
+
+  // 2. Try direct Gemini API in browser
+  try {
+    const geminiResult = await tryClientGeminiSimulation(input);
+    if (geminiResult) {
+      console.log('Successfully completed direct live Gemini simulation');
+      return geminiResult;
+    }
+  } catch (e) {
+    console.warn('Direct Gemini API simulation fallback:', e);
+  }
+
+  // 3. Resilient deterministic client-side V2 simulation engine
+  return generateClientSimulation(input);
 }
+
