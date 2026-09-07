@@ -3,6 +3,8 @@ import {
   AgentImpactDomain,
   PolicyUnderstanding,
   ScenarioInput,
+  StructuredProposalUnderstanding,
+  LocationImpactContext,
 } from '../types.js';
 import { InfrastructureLookupResult } from '../infrastructure.js';
 
@@ -11,6 +13,10 @@ export interface AgentExecutionContext {
   policy: PolicyUnderstanding;
   infrastructure: InfrastructureLookupResult;
   locationTitle: string;
+  proposalUnderstanding?: StructuredProposalUnderstanding;
+  locationImpactContext?: LocationImpactContext;
+  unknowns?: string[];
+  verifiedEvidence?: string[];
 }
 
 /**

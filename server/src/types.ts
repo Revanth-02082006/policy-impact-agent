@@ -153,6 +153,68 @@ export interface AgentAnalysis {
     trend?: 'positive' | 'negative' | 'neutral';
   }>;
   confidence?: number; // 0 to 100
+  conditionEvaluation?: DomainConditionEvaluation;
+}
+
+export type DomainImpactClassification =
+  | 'Significant Positive'
+  | 'Potential Positive'
+  | 'Neutral'
+  | 'Potential Negative'
+  | 'Significant Negative'
+  | 'Minimal/No Direct Impact'
+  | 'Insufficient Evidence';
+
+export interface DomainConditionEvaluation {
+  domain: AgentImpactDomain;
+  relevance: 'Directly Relevant' | 'Contextually Relevant' | 'Indirect / Secondary' | 'Minimal/No Direct Impact';
+  impactClassification: DomainImpactClassification;
+  positiveImpacts: string[];
+  negativeImpacts: string[];
+  locationFactors: string[];
+  evidence: string[];
+  unknowns: string[];
+  mitigationOptions: string[];
+  confidence: number;
+}
+
+export interface SensitiveReceptor {
+  type: string;
+  name: string;
+  relevance: string;
+  distanceOrProximity: string;
+  source: string;
+  verificationStatus: 'Verified' | 'Inferred' | 'Unverified / Unknown';
+  potentialImpact: string;
+}
+
+export interface LocationImpactContext {
+  selectedLocation: string;
+  locationVerificationStatus: 'Verified' | 'Partially Verified' | 'Unverified / Unknown';
+  landUseContext: string;
+  environmentalContext: string;
+  waterContext: string;
+  populationContext: string;
+  infrastructureContext: string;
+  transportContext: string;
+  publicSafetyContext: string;
+  economicContext: string;
+  administrativeContext: string;
+  sensitiveReceptors: SensitiveReceptor[];
+  locationAdvantages: string[];
+  locationRisks: string[];
+  locationConstraints: string[];
+  locationUnknowns: string[];
+  evidenceSources: string[];
+  confidence: number;
+  locationCompatibilityScore: number;
+  locationCompatibilityClassification:
+    | 'Highly Compatible'
+    | 'Moderately Compatible'
+    | 'Conditional / Safeguards Required'
+    | 'High Conflict / Incompatible';
+  compatibilityRationale: string;
+  domainConditionEvaluations?: Record<AgentImpactDomain, DomainConditionEvaluation>;
 }
 
 export interface CascadingNode {
@@ -367,6 +429,7 @@ export interface SimulationResult {
     };
   };
   proposalUnderstanding?: StructuredProposalUnderstanding;
+  locationImpactContext?: LocationImpactContext;
 }
 
 export type BalancedImpactLevel =

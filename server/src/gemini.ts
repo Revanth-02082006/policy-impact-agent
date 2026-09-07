@@ -11,6 +11,7 @@ import {
   FrictionClassification,
   getGainClassification,
   getFrictionClassification,
+  LocationImpactContext,
 } from './types.js';
 import {
   generateGenericFallbackResult,
@@ -27,6 +28,7 @@ import { findInfrastructure, InfrastructureLookupResult } from './infrastructure
 import { AgentRegistry } from './agents/registry.js';
 import { classifyPolicy } from './agents/implementations.js';
 import { extractStructuredProposalUnderstanding } from './proposalUnderstanding.js';
+import { analyzeLocationConditionedImpact } from './locationConditionedAnalysis.js';
 
 export async function runGeminiSimulation(input: ScenarioInput): Promise<SimulationResult> {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -41,15 +43,23 @@ export async function runGeminiSimulation(input: ScenarioInput): Promise<Simulat
   );
 
   const locationProfile = resolveLocationAdministrativeProfile(input);
+  const structuredUnderstanding = extractStructuredProposalUnderstanding(input);
+  const locAnalysis = analyzeLocationConditionedImpact(
+    structuredUnderstanding,
+    input,
+    infrastructureData,
+    locationProfile
+  );
+  const locationImpactContext = locAnalysis.locationImpactContext;
 
   if (!apiKey || apiKey.trim() === '' || apiKey.includes('your_gemini_api_key')) {
     console.log('[Gemini Engine] No valid GEMINI_API_KEY found. Utilizing dynamic fallback mode.');
-    return getFallbackSimulation(input, infrastructureData);
+    return getFallbackSimulation(input, infrastructureData, locationImpactContext);
   }
 
   try {
     const ai = new GoogleGenAI({ apiKey });
-    const prompt = buildOrchestrationPrompt(input, infrastructureData, locationProfile);
+    const prompt = buildOrchestrationPrompt(input, infrastructureData, locationProfile, locationImpactContext);
 
     let jsonText = '';
     const modelsToTry = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
@@ -86,17 +96,22 @@ export async function runGeminiSimulation(input: ScenarioInput): Promise<Simulat
     }
 
     const parsed = JSON.parse(jsonText);
-    return formatGeminiResponseToSimulationResult(parsed, input, infrastructureData, locationProfile);
+    return formatGeminiResponseToSimulationResult(parsed, input, infrastructureData, locationProfile, locationImpactContext);
   } catch (error: any) {
     console.warn('[Gemini Engine] Live Gemini analysis failed. Utilizing dynamic fallback simulation:', error?.message || error);
-    return getFallbackSimulation(input, infrastructureData);
+    return getFallbackSimulation(input, infrastructureData, locationImpactContext);
   }
 }
 
-function getFallbackSimulation(input: ScenarioInput, infrastructureData: InfrastructureLookupResult): SimulationResult {
+function getFallbackSimulation(
+  input: ScenarioInput,
+  infrastructureData: InfrastructureLookupResult,
+  locationImpactContext?: LocationImpactContext
+): SimulationResult {
   const base = generateGenericFallbackResult(input);
   return {
     ...base,
+    locationImpactContext: locationImpactContext || base.locationImpactContext,
     input: {
       ...input,
       latitude: input.latitude !== undefined && Number.isFinite(input.latitude) ? input.latitude : infrastructureData.center.latitude,
@@ -116,7 +131,8 @@ function getFallbackSimulation(input: ScenarioInput, infrastructureData: Infrast
 function buildOrchestrationPrompt(
   input: ScenarioInput,
   infra: InfrastructureLookupResult,
-  locContext?: LocationAdministrativeContext
+  locContext?: LocationAdministrativeContext,
+  locImpactContext?: LocationImpactContext
 ): string {
   const locationTitle = [infra.resolvedArea, input.town || input.city, input.district, 'Tamil Nadu'].filter(Boolean).join(', ');
   const targetAsset = input.selectedAsset || input.description;
@@ -125,7 +141,7 @@ function buildOrchestrationPrompt(
 
   return `You are an experienced Municipal Administration Decision Analyst whose responsibility is to protect public welfare, environmental sustainability, legal compliance, and efficient municipal governance. You must never act like a project promoter, investment advisor, marketing assistant, or policy supporter. Every proposal must be critically evaluated with neutrality, caution, and evidence-based administrative reasoning.
 
-FOUR INTERDEPENDENT EVALUATION INPUTS:
+FIVE INTERDEPENDENT EVALUATION INPUTS:
 1. THE PROPOSAL: Literal meaning only. Zero assumed benefits.
 2. THE SELECTED LOCATION: "${locationTitle}" (District: ${locContext?.district || input.district || 'Tamil Nadu'}, Area: ${locContext?.resolvedArea || infra.resolvedArea})
 3. REAL-WORLD CONTEXTUAL INFORMATION:
@@ -140,10 +156,21 @@ FOUR INTERDEPENDENT EVALUATION INPUTS:
    - Statutory Regimes: ${locContext?.applicableStatutoryFrameworks?.join('; ') || 'Standard municipal regulations'}
    - High-Risk Actions Detected: ${locContext?.highRiskActionsDetected?.join(', ') || 'None'}
    - Context Summary: ${locContext?.contextualAnalysisSummary || 'Standard municipal baseline'}
-4. MUNICIPAL ADMINISTRATIVE REASONING:
+4. LOCATION-CONDITIONED ANALYSIS & SENSITIVE RECEPTORS (GROUND TRUTH):
+   - Location Compatibility Score: ${locImpactContext?.locationCompatibilityScore ?? 50}/100
+   - Location Suitability Status: "${locImpactContext?.locationCompatibilityClassification ?? 'Conditional / Safeguards Required'}"
+   - Compatibility Rationale: ${locImpactContext?.compatibilityRationale ?? 'Baseline review'}
+   - Identified Sensitive Receptors in Vicinity:
+${(locImpactContext?.sensitiveReceptors || []).map(r => `     * ${r.name} (${r.type}) | Proximity: ${r.distanceOrProximity} | Status: ${r.verificationStatus} | Impact: ${r.potentialImpact}`).join('\n') || '     * None identified / Conforming zone'}
+   - Location Unknowns (Must NOT hallucinate): ${locImpactContext?.locationUnknowns?.join('; ') || 'None'}
+   - Proximity Mandate: NEVER hallucinate proximity or distances. Unstated distances MUST be marked UNKNOWN.
+5. MUNICIPAL ADMINISTRATIVE REASONING:
    - Same proposal MUST yield different results in different locations:
-     * Factory inside approved industrial estate (SIPCOT/SIDCO): Moderate Benefit (Gain 48–54), Manageable Risk (Friction 40–48).
-     * Same factory in farmland/river basin/residential: Significantly higher environmental & social risk (Gain 18–30, Friction 78–92).
+     * Factory inside approved industrial estate (SIPCOT/SIDCO): Moderate Benefit (Gain 48–54), Manageable Risk (Friction 36–46).
+     * Same factory in farmland/river basin/residential: Significantly higher environmental & social risk (Gain 10–26, Friction 82–95).
+     * Dam flood water release: Gain 75–85, Friction 20–30. Dam drought water diversion: Gain 10–20, Friction 90–98.
+     * Road widening on vacant bypass: Gain 70–80, Friction 24–34. Road widening in dense residential/bazaar street: Gain 25–35, Friction 82–94.
+   - For domains with no direct impact, assign "Minimal/No Direct Impact" and 0 friction (do NOT assign arbitrary 15-20 friction).
      * Dam flood water release: Gain 75–85, Friction 20–30. Dam drought water diversion: Gain 10–20, Friction 90–98.
      * Road widening on vacant bypass: Gain 70–80, Friction 24–34. Road widening in dense residential/bazaar street: Gain 25–35, Friction 82–94.
 
@@ -427,7 +454,8 @@ function formatGeminiResponseToSimulationResult(
   parsed: any,
   input: ScenarioInput,
   infra: InfrastructureLookupResult,
-  locContext?: LocationAdministrativeContext
+  locContext?: LocationAdministrativeContext,
+  locImpactContext?: LocationImpactContext
 ): SimulationResult {
   const locationTitle = [infra.resolvedArea, input.town || input.city, input.district, 'Tamil Nadu'].filter(Boolean).join(', ');
   const targetAsset = input.selectedAsset || input.description;
@@ -448,31 +476,68 @@ function formatGeminiResponseToSimulationResult(
   ];
 
   for (const domain of domainKeys) {
+    const condEval = locImpactContext?.domainConditionEvaluations ? locImpactContext.domainConditionEvaluations[domain] : undefined;
+    const isMinimalImpact = condEval?.relevance === 'Minimal/No Direct Impact' || condEval?.impactClassification === 'Minimal/No Direct Impact';
+    const condSummary = condEval?.positiveImpacts?.[0] || condEval?.negativeImpacts?.[0] || condEval?.locationFactors?.[0] || `Minimal/No direct impact on ${domain.replace('_', ' ')} under verified local conditions.`;
+
     if (parsed.agentAnalyses && parsed.agentAnalyses[domain]) {
       const raw = parsed.agentAnalyses[domain];
       agentAnalyses[domain] = {
         domain,
         domainName: raw.domainName || `${domain.replace('_', ' ').toUpperCase()} Agent`,
-        overallSeverity: raw.overallSeverity || 'moderate',
-        score: typeof raw.score === 'number' ? raw.score : 35,
-        positiveScore: typeof raw.positiveScore === 'number' ? raw.positiveScore : undefined,
-        confidence: typeof raw.confidence === 'number' ? raw.confidence : 88,
-        summary: raw.summary || `Analysis completed for ${domain}.`,
-        findings: Array.isArray(raw.findings) ? raw.findings : [],
-        positiveFindings: Array.isArray(raw.positiveFindings) ? raw.positiveFindings : [],
-        negativeFindings: Array.isArray(raw.negativeFindings) ? raw.negativeFindings : [],
+        overallSeverity: isMinimalImpact ? 'very_low' : (raw.overallSeverity || 'moderate'),
+        score: isMinimalImpact ? 0 : (typeof raw.score === 'number' ? raw.score : 35),
+        positiveScore: isMinimalImpact ? 0 : (typeof raw.positiveScore === 'number' ? raw.positiveScore : undefined),
+        confidence: typeof raw.confidence === 'number' ? raw.confidence : (condEval?.confidence ?? 88),
+        summary: isMinimalImpact
+          ? condSummary
+          : (raw.summary || `Analysis completed for ${domain}.`),
+        findings: isMinimalImpact
+          ? [
+              {
+                id: `${domain}_min_1`,
+                title: 'Minimal Direct Footprint',
+                description: condSummary,
+                severity: 'very_low',
+                sourceAgent: domain,
+                provenance: 'verified_geographic_data',
+                entityAffected: 'Surrounding District & Infrastructure',
+                polarity: 'neutral',
+              },
+            ]
+          : (Array.isArray(raw.findings) ? raw.findings : []),
+        positiveFindings: isMinimalImpact ? [] : (Array.isArray(raw.positiveFindings) ? raw.positiveFindings : []),
+        negativeFindings: isMinimalImpact ? [] : (Array.isArray(raw.negativeFindings) ? raw.negativeFindings : []),
         metrics: Array.isArray(raw.metrics) ? raw.metrics : [],
+        conditionEvaluation: condEval,
       };
     } else {
       agentAnalyses[domain] = {
         domain,
         domainName: `${domain.replace('_', ' ').toUpperCase()} Agent`,
-        overallSeverity: 'moderate',
-        score: 50,
-        confidence: 85,
-        summary: `Domain impact analysis for ${domain} completed with standard baseline.`,
-        findings: [],
+        overallSeverity: isMinimalImpact ? 'very_low' : 'moderate',
+        score: isMinimalImpact ? 0 : 50,
+        positiveScore: isMinimalImpact ? 0 : undefined,
+        confidence: condEval?.confidence ?? 85,
+        summary: isMinimalImpact
+          ? condSummary
+          : `Domain impact analysis for ${domain.replace('_', ' ')} completed with standard baseline.`,
+        findings: isMinimalImpact
+          ? [
+              {
+                id: `${domain}_min_1`,
+                title: 'Minimal Direct Footprint',
+                description: condSummary,
+                severity: 'very_low',
+                sourceAgent: domain,
+                provenance: 'verified_geographic_data',
+                entityAffected: 'Surrounding District & Infrastructure',
+                polarity: 'neutral',
+              },
+            ]
+          : [],
         metrics: [],
+        conditionEvaluation: condEval,
       };
     }
   }
@@ -490,7 +555,8 @@ function formatGeminiResponseToSimulationResult(
     semanticIntent.polarity === 'negative' ? 'negative' : rawPolarity,
     input.description,
     semanticIntent.archetype,
-    locContext
+    locContext,
+    locImpactContext
   );
 
   let gainScore = typeof parsed.gainScore === 'number' ? parsed.gainScore : framework.gainScore;
@@ -711,9 +777,11 @@ function formatGeminiResponseToSimulationResult(
       agentAnalyses,
       impactScores,
       finalPolarity,
-      locContext
+      locContext,
+      locImpactContext
     ),
     locationContextAnalysis: locContext,
+    locationImpactContext: locImpactContext,
     proposalUnderstanding: structuredUnderstanding,
     disclaimer: MANDATORY_DISCLAIMER,
   };

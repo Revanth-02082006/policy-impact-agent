@@ -20,11 +20,17 @@ import {
   getGainClassification,
   getFrictionClassification,
   StructuredProposalUnderstanding,
+  LocationImpactContext,
+  DomainConditionEvaluation,
 } from '../types/index.js';
 import {
   resolveLocationAdministrativeProfile,
   LocationAdministrativeContext,
 } from '../data/locationContextData.js';
+import {
+  analyzeLocationConditionedImpact,
+} from './locationConditionedAnalysis.js';
+import { InfrastructureLookupResponse as InfrastructureLookupResult } from './api.js';
 
 export const MANDATORY_DISCLAIMER =
   'This platform provides AI-assisted simulations for decision support only. Results are based on available information, assumptions, and heuristic reasoning. Final decisions should be made by qualified government authorities using official data and expert evaluation.';
@@ -288,7 +294,8 @@ export function computeFrameworkGainAndFriction(
   hintPolarity?: 'positive' | 'negative' | 'mixed',
   description: string = '',
   archetype?: PolicyArchetype,
-  locationContext?: LocationAdministrativeContext
+  locationContext?: LocationAdministrativeContext,
+  locationImpactContext?: LocationImpactContext
 ): {
   gainScore: number;
   gainClassification: GainClassification;
@@ -503,8 +510,10 @@ export function computeFrameworkGainAndFriction(
   }
 
   // STRICT CONTEXT-AWARE DECISION RULES FOR GAIN:
-  if (locationContext?.isApprovedIndustrialZone && isIndustrialManufacturing && !hasDisplacement && !hasAgriLoss) {
-    gain = Math.max(48, Math.min(54, gain));
+  if (locationImpactContext?.locationCompatibilityClassification === 'High Conflict / Incompatible') {
+    gain = Math.max(10, Math.min(26, gain)); // Capped at Low to Very Low Gain (10-26)
+  } else if ((locationImpactContext?.locationCompatibilityClassification === 'Highly Compatible' || locationContext?.isApprovedIndustrialZone) && isIndustrialManufacturing && !hasDisplacement && !hasAgriLoss) {
+    gain = Math.max(48, Math.min(56, gain));
   } else if ((locationContext?.isAgriculturalOrRuralZone || /(farmland|agricultural|crop|fertile)/i.test(descLower)) && isIndustrialManufacturing && !hasDisplacement) {
     gain = Math.max(20, Math.min(32, gain));
   } else if ((locationContext?.isEcoSensitiveOrWaterBuffer || /(wetland|marsh|lake|river|forest)/i.test(descLower)) && isIndustrialManufacturing && !hasDisplacement) {
@@ -540,8 +549,11 @@ export function computeFrameworkGainAndFriction(
   const gainClassification = getGainClassification(gain);
 
   let gainJustification = '';
-  if (locationContext?.isApprovedIndustrialZone && isIndustrialManufacturing && !hasDisplacement && !hasAgriLoss) {
-    gainJustification = `Net benefit is Moderate (${gain}/100): Situated within an approved industrial estate (${locationContext.municipalInfrastructureBaseline[0] || 'SIPCOT/SIDCO'}), benefiting from established industrial zoning, statutory infrastructure, and buffer distances from residential settlements.`;
+  if (locationImpactContext?.locationCompatibilityClassification === 'High Conflict / Incompatible') {
+    const receptors = locationImpactContext.sensitiveReceptors?.map(r => r.name).join(', ') || 'fertile farmlands / river basin';
+    gainJustification = `Net benefit is Low to Very Low (${gain}/100): Sited in an incompatible location (${locationImpactContext.selectedLocation}) with direct spatial conflict against sensitive receptors (${receptors}). Potential commercial returns cannot override severe irreversible agrarian, environmental, and community degradation.`;
+  } else if ((locationImpactContext?.locationCompatibilityClassification === 'Highly Compatible' || locationContext?.isApprovedIndustrialZone) && isIndustrialManufacturing && !hasDisplacement && !hasAgriLoss) {
+    gainJustification = `Net benefit is Moderate (${gain}/100): Sited within an approved industrial estate (${locationContext?.municipalInfrastructureBaseline[0] || 'SIPCOT/SIDCO'}), benefiting from established industrial zoning, statutory infrastructure, and buffer distances from residential settlements.`;
   } else if (locationContext?.isAgriculturalOrRuralZone && isIndustrialManufacturing && !hasDisplacement) {
     gainJustification = `Net benefit is Low (${gain}/100): Industrial placement on active farmlands in ${locationContext.district} results in severe topsoil destruction and permanent loss of agrarian livelihoods that substantially depress net societal benefit.`;
   } else if (/(dam|water release|excess water)/i.test(descLower) && /(flood|monsoon|surplus|precaution)/i.test(descLower)) {
@@ -704,8 +716,10 @@ export function computeFrameworkGainAndFriction(
   }
 
   // STRICT DECISION RULES FOR FRICTION:
-  if (locationContext?.isApprovedIndustrialZone && isIndustrialManufacturing && !hasDisplacement && !hasAgriLoss) {
-    friction = Math.max(40, Math.min(48, friction));
+  if (locationImpactContext?.locationCompatibilityClassification === 'High Conflict / Incompatible') {
+    friction = Math.max(82, Math.min(95, friction)); // High to Very High Friction (82–95)
+  } else if ((locationImpactContext?.locationCompatibilityClassification === 'Highly Compatible' || locationContext?.isApprovedIndustrialZone) && isIndustrialManufacturing && !hasDisplacement && !hasAgriLoss) {
+    friction = Math.max(36, Math.min(46, friction));
   } else if ((locationContext?.isAgriculturalOrRuralZone || /(farmland|agricultural|crop|fertile)/i.test(descLower)) && isIndustrialManufacturing && !hasDisplacement) {
     friction = Math.max(76, Math.min(90, friction));
   } else if ((locationContext?.isEcoSensitiveOrWaterBuffer || /(wetland|marsh|lake|river|forest)/i.test(descLower)) && isIndustrialManufacturing && !hasDisplacement) {
@@ -737,7 +751,10 @@ export function computeFrameworkGainAndFriction(
   const frictionClassification = getFrictionClassification(friction);
 
   let frictionJustification = '';
-  if (locationContext?.isApprovedIndustrialZone && isIndustrialManufacturing && !hasDisplacement && !hasAgriLoss) {
+  if (locationImpactContext?.locationCompatibilityClassification === 'High Conflict / Incompatible') {
+    const receptors = locationImpactContext.sensitiveReceptors?.map(r => `${r.name} (${r.type})`).join(', ') || 'sensitive receptors';
+    frictionJustification = `Implementation friction is Very High (${friction}/100): High Conflict location incompatibility. Placing this development in direct proximity to ${receptors} triggers intense farmer/community resistance, severe environmental compliance violations, and imminent judicial injunctions.`;
+  } else if ((locationImpactContext?.locationCompatibilityClassification === 'Highly Compatible' || locationContext?.isApprovedIndustrialZone) && isIndustrialManufacturing && !hasDisplacement && !hasAgriLoss) {
     frictionJustification = `Implementation friction is Moderate (${friction}/100): Manageable operational requirements within an approved industrial park, requiring standard TNPCB Consent to Establish and trade effluent compliance without residential eviction or agricultural disruption.`;
   } else if (locationContext?.isAgriculturalOrRuralZone && isIndustrialManufacturing && !hasDisplacement) {
     frictionJustification = `Implementation friction is High to Very High (${friction}/100): Triggered by strong agrarian resistance against farmlands conversion in ${locationContext.district}, environmental opposition, and strict statutory agricultural preservation mandates.`;
@@ -780,18 +797,19 @@ export function computeImpactScores(
   hintPolarity?: 'positive' | 'negative' | 'mixed',
   description: string = '',
   archetype?: PolicyArchetype,
-  locationContext?: LocationAdministrativeContext
+  locationContext?: LocationAdministrativeContext,
+  locationImpactContext?: LocationImpactContext
 ): ImpactScores {
   // Operational Friction / Disruption scores (0-100)
-  const transport = analyses.transport?.score ?? 35;
-  const infrastructure = analyses.infrastructure?.score ?? 30;
-  const economic = analyses.economic?.score ?? 30;
-  const environmental = analyses.environmental?.score ?? 35;
-  const population = analyses.population?.score ?? 30;
-  const essentialServices = analyses.essential_services?.score ?? 30;
-  const disasterRisk = analyses.disaster_risk?.score ?? 25;
-  const social = analyses.social?.score ?? 25;
-  const policyCompliance = analyses.policy_compliance?.score ?? 20;
+  const transport = analyses.transport?.score ?? 0;
+  const infrastructure = analyses.infrastructure?.score ?? 0;
+  const economic = analyses.economic?.score ?? 0;
+  const environmental = analyses.environmental?.score ?? 0;
+  const population = analyses.population?.score ?? 0;
+  const essentialServices = analyses.essential_services?.score ?? 0;
+  const disasterRisk = analyses.disaster_risk?.score ?? 0;
+  const social = analyses.social?.score ?? 0;
+  const policyCompliance = analyses.policy_compliance?.score ?? 0;
 
   const publicSafety = Math.round((disasterRisk * 0.5) + (essentialServices * 0.3) + (policyCompliance * 0.2));
   const healthcare = Math.round((essentialServices * 0.7) + (population * 0.3));
@@ -803,7 +821,8 @@ export function computeImpactScores(
     hintPolarity,
     description,
     archetype,
-    locationContext
+    locationContext,
+    locationImpactContext
   );
 
   const overallPolicyRisk = framework.frictionScore;
@@ -856,7 +875,9 @@ export function computeImpactScores(
   const netViabilityScore = Math.max(5, Math.min(98, Math.round(((overallSocietalBenefit * 1.3) - (overallPolicyRisk * 1.1) + 100) / 2)));
 
   let derivedPolarity: 'positive' | 'negative' | 'mixed' = hintPolarity || 'mixed';
-  if (!hintPolarity) {
+  if (locationImpactContext?.locationCompatibilityClassification === 'High Conflict / Incompatible') {
+    derivedPolarity = 'negative';
+  } else if (!hintPolarity) {
     if (overallPolicyRisk >= 65 || (overallPolicyRisk - overallSocietalBenefit) >= 20 || netViabilityScore < 45) {
       derivedPolarity = 'negative';
     } else if (overallSocietalBenefit >= 68 && overallPolicyRisk <= 42 && netViabilityScore >= 65) {
@@ -912,10 +933,17 @@ export function buildBalancedDecisionEvaluation(
   agentAnalyses: Record<AgentImpactDomain, AgentAnalysis>,
   impactScores: ImpactScores,
   intentPolarity: 'positive' | 'negative' | 'mixed',
-  locationContext?: LocationAdministrativeContext
+  locationContext?: LocationAdministrativeContext,
+  locationImpactContext?: LocationImpactContext
 ): BalancedDecisionEvaluation {
   const descLower = description.toLowerCase();
   const text = `${description} ${policy.reason || ''} ${policy.summary || ''}`.toLowerCase();
+
+  // Location-Conditioned Receptors Check
+  const hasAgriReceptor = locationImpactContext?.sensitiveReceptors?.some(r => r.type.toLowerCase().includes('agri'));
+  const hasWaterReceptor = locationImpactContext?.sensitiveReceptors?.some(r => r.type.toLowerCase().includes('water') || r.type.toLowerCase().includes('river'));
+  const hasPopulatedReceptor = locationImpactContext?.sensitiveReceptors?.some(r => r.type.toLowerCase().includes('resident') || r.type.toLowerCase().includes('settlement'));
+  const isLocationConflict = locationImpactContext?.locationCompatibilityClassification === 'High Conflict / Incompatible';
 
   // 1. Detect Severe Negative Override Flags
   const isAgrarianDestructionWord =
@@ -943,7 +971,8 @@ export function buildBalancedDecisionEvaluation(
     archetype === 'agricultural_destruction_hazard' ||
     (isAgrarianDestructionWord && isAgrarianLandWord) ||
     descLower.includes('destruction of agricultur') ||
-    (Boolean(locationContext?.isAgriculturalOrRuralZone) && !locationContext?.isApprovedIndustrialZone && /(factory|industrial|manufacturing|plant|acquire|convert|demolish)/i.test(descLower));
+    (Boolean(locationContext?.isAgriculturalOrRuralZone) && !locationContext?.isApprovedIndustrialZone && /(factory|industrial|manufacturing|plant|acquire|convert|demolish)/i.test(descLower)) ||
+    (isLocationConflict && Boolean(hasAgriReceptor));
 
   const isVacantOrBypass = (descLower.includes('widen') || descLower.includes('widening')) && (descLower.includes('vacant') || descLower.includes('bypass') || descLower.includes('peripheral') || descLower.includes('outer ring'));
 
@@ -959,7 +988,8 @@ export function buildBalancedDecisionEvaluation(
       descLower.includes('families') ||
       descLower.includes('resettle') ||
       descLower.includes('slum clearance') ||
-      ((descLower.includes('widen') || descLower.includes('widening')) && (descLower.includes('dense') || descLower.includes('residential') || descLower.includes('bazaar') || descLower.includes('shop') || Boolean(locationContext?.isHighDensityResidential)))
+      ((descLower.includes('widen') || descLower.includes('widening')) && (descLower.includes('dense') || descLower.includes('residential') || descLower.includes('bazaar') || descLower.includes('shop') || Boolean(locationContext?.isHighDensityResidential))) ||
+      (isLocationConflict && Boolean(hasPopulatedReceptor) && /(evict|displace|demolish|relocate)/i.test(descLower))
     );
 
   const irreversibleEnvironmentalDamage =
@@ -971,7 +1001,8 @@ export function buildBalancedDecisionEvaluation(
     descLower.includes('wetland destruction') ||
     descLower.includes('lake bed encroachment') ||
     descLower.includes('forest clear') ||
-    (Boolean(locationContext?.isEcoSensitiveOrWaterBuffer) && !locationContext?.isApprovedIndustrialZone && /(factory|industrial|chemical|dyeing|effluent|pollut)/i.test(descLower));
+    (Boolean(locationContext?.isEcoSensitiveOrWaterBuffer) && !locationContext?.isApprovedIndustrialZone && /(factory|industrial|chemical|dyeing|effluent|pollut)/i.test(descLower)) ||
+    (isLocationConflict && Boolean(hasWaterReceptor));
 
   const seriousPollution =
     archetype === 'polluting_industry_hazard' ||
@@ -982,13 +1013,15 @@ export function buildBalancedDecisionEvaluation(
     descLower.includes('toxic effluent') ||
     descLower.includes('clinker dust') ||
     descLower.includes('hazardous emission') ||
-    (Boolean(locationContext?.isEcoSensitiveOrWaterBuffer || locationContext?.isHighDensityResidential) && !locationContext?.isApprovedIndustrialZone && /(factory|manufacturing|textile|industrial)/i.test(descLower));
+    (Boolean(locationContext?.isEcoSensitiveOrWaterBuffer || locationContext?.isHighDensityResidential) && !locationContext?.isApprovedIndustrialZone && /(factory|manufacturing|textile|industrial)/i.test(descLower)) ||
+    (isLocationConflict && /(chemical|cement|industrial|manufacturing|factory|effluent)/i.test(descLower));
 
   const publicSafetyRisks =
     descLower.includes('explosion') ||
     descLower.includes('hazardous material') ||
     descLower.includes('structural collapse') ||
-    descLower.includes('fire hazard');
+    descLower.includes('fire hazard') ||
+    (isLocationConflict && Boolean(hasPopulatedReceptor) && /(chemical|toxic|hazardous)/i.test(descLower));
 
   const violatesMunicipalRegulations =
     archetype === 'displacement_relocation_industrial' ||
@@ -998,7 +1031,8 @@ export function buildBalancedDecisionEvaluation(
     descLower.includes('unauthorized') ||
     descLower.includes('master plan violation') ||
     (agentAnalyses.policy_compliance?.score ?? 0) >= 75 ||
-    (!locationContext?.isApprovedIndustrialZone && Boolean(locationContext?.isAgriculturalOrRuralZone || locationContext?.isEcoSensitiveOrWaterBuffer) && /(factory|industrial|plant)/i.test(descLower));
+    (!locationContext?.isApprovedIndustrialZone && Boolean(locationContext?.isAgriculturalOrRuralZone || locationContext?.isEcoSensitiveOrWaterBuffer) && /(factory|industrial|plant)/i.test(descLower)) ||
+    isLocationConflict;
 
   const severeImpactFlags = {
     irreversibleEnvironmentalDamage,
@@ -1233,6 +1267,18 @@ export function buildBalancedDecisionEvaluation(
       ],
       negativeImpacts: ['Temporary localized traffic adjustments during building phase'],
       evidence: 'Delivers transformative social welfare equity and widespread citizen satisfaction.',
+    };
+  } else if (/(government complex|administrative complex|collectorate|secretariat|civic center|taluk office)/i.test(descLower)) {
+    dimensions.social = {
+      dimension: 'social',
+      dimensionLabel: 'Social Impact',
+      impactLevel: 'High Positive',
+      positiveImpacts: [
+        'Centralized single-window public access for citizen certificates, welfare schemes, and grievances',
+        'Barrier-free universal accessibility and modern civic public amenities for all citizens',
+      ],
+      negativeImpacts: [],
+      evidence: 'Centralized government administrative complex provides high social utility and equitable public access.',
     };
   } else if ((text.includes('widen') || text.includes('widening')) && (text.includes('vacant') || text.includes('bypass'))) {
     dimensions.social = {
@@ -1471,6 +1517,19 @@ export function buildBalancedDecisionEvaluation(
       negativeImpacts: ['Emergency coordination and downstream evacuation logistics required'],
       evidence: 'Follows established state disaster management protocol with clear administrative command structure.',
     };
+  } else if (/(government complex|administrative complex|collectorate|secretariat|civic center|taluk office)/i.test(descLower)) {
+    dimensions.municipalAdmin = {
+      dimension: 'municipalAdmin',
+      dimensionLabel: 'Municipal Administration Impact',
+      impactLevel: 'High Positive',
+      positiveImpacts: [
+        'Consolidates fragmented district and municipal departmental offices into an integrated civic center',
+        'Improves citizen service delivery efficiency and streamlines administrative grievance processing',
+        'Drastically cuts intra-departmental courier and administrative transit latency',
+      ],
+      negativeImpacts: ['Requires initial phased inter-office shifting and IT migration coordination'],
+      evidence: 'Direct expansion of public administrative infrastructure streamlines municipal governance and public service delivery.',
+    };
   } else {
     dimensions.municipalAdmin = {
       dimension: 'municipalAdmin',
@@ -1661,7 +1720,9 @@ export function buildBalancedDecisionEvaluation(
   // Determine Overall Classification strictly under Mandatory Neutrality & Equal Weighting Rules
   let overallClassification: 'Positive' | 'Mixed' | 'Negative' = 'Mixed';
 
-  if (destructionOfAgriculturalLand || displacementOfPeople || (seriousPollution && !archetype.includes('hospital'))) {
+  if (locationImpactContext?.locationCompatibilityClassification === 'High Conflict / Incompatible') {
+    overallClassification = 'Negative';
+  } else if (destructionOfAgriculturalLand || displacementOfPeople || (seriousPollution && !archetype.includes('hospital'))) {
     // Severe reduction overrides: Irreversible environmental damage, destruction of agricultural land, displacement of people
     overallClassification = 'Negative';
   } else if ((descLower.includes('dam') || descLower.includes('water')) && (descLower.includes('drought') || descLower.includes('dry') || descLower.includes('block') || descLower.includes('divert'))) {
@@ -1672,7 +1733,9 @@ export function buildBalancedDecisionEvaluation(
     overallClassification = 'Positive';
   } else if ((descLower.includes('widen') || descLower.includes('widening')) && (descLower.includes('vacant') || descLower.includes('bypass'))) {
     overallClassification = 'Positive';
-  } else if (locationContext?.isApprovedIndustrialZone && isIndustrialManufacturing && !hasDisplacement && !hasAgriLoss) {
+  } else if (/(government complex|administrative complex|collectorate|secretariat|civic center|taluk office)/i.test(descLower) && (locationImpactContext?.locationCompatibilityClassification === 'Highly Compatible' || /(government zone|civic zone|administrative zone|institutional)/i.test(text))) {
+    overallClassification = 'Positive';
+  } else if ((locationImpactContext?.locationCompatibilityClassification === 'Highly Compatible' || locationContext?.isApprovedIndustrialZone) && isIndustrialManufacturing && !hasDisplacement && !hasAgriLoss) {
     // Approved Industrial Estate (e.g. SIPCOT/SIDCO): balanced commercial gain with manageable compliance friction
     overallClassification = 'Mixed';
   } else if ((locationContext?.isAgriculturalOrRuralZone || locationContext?.isEcoSensitiveOrWaterBuffer) && isIndustrialManufacturing) {
@@ -1711,7 +1774,10 @@ export function buildBalancedDecisionEvaluation(
     .map(([flag]) => flag.replace(/([A-Z])/g, ' $1').toLowerCase());
 
   let classificationRationale = '';
-  if (overallClassification === 'Negative') {
+  if (locationImpactContext?.locationCompatibilityClassification === 'High Conflict / Incompatible') {
+    const receptors = locationImpactContext.sensitiveReceptors?.map(r => r.name).join(', ') || 'agricultural lands & water body';
+    classificationRationale = `The proposal is classified as Negative due to Critical Location Conflict (Compatibility Score: ${locationImpactContext.locationCompatibilityScore}/100). Siting at ${locationImpactContext.selectedLocation} directly violates spatial zoning and poses acute ecological/agrarian hazards to ${receptors}. Potential economic gains are heavily outweighed by severe impacts in ${negDims.join(', ')}. Triggered override flags: ${triggeredFlags.join(', ')}. Rejection of the current site and adoption of Alternative A (relocation to an approved SIPCOT/SIDCO industrial estate) is strongly advised.`;
+  } else if (overallClassification === 'Negative') {
     classificationRationale = `The proposal is classified as Negative under administrative evaluation rules. While isolated gains were identified in ${posDims.length ? posDims.join(', ') : 'speculative commercial expansion'}, they are overwhelmingly eclipsed by severe adverse impacts in ${negDims.join(', ')}. Critically, the proposal triggers severe override flags: ${triggeredFlags.join(', ')}. Under strict municipal administration standards, commercial growth does not override severe human displacement, agricultural land destruction, public health hazards, or ecological degradation.`;
   } else if (overallClassification === 'Mixed') {
     if (locationContext?.isApprovedIndustrialZone && isIndustrialManufacturing) {
@@ -1778,6 +1844,84 @@ export function buildBalancedDecisionEvaluation(
   };
 }
 
+export function applyConditionEvaluationsToAnalyses(
+  analyses: Record<AgentImpactDomain, AgentAnalysis>,
+  locationImpactContext?: LocationImpactContext
+): Record<AgentImpactDomain, AgentAnalysis> {
+  const updated = { ...analyses };
+  const evals = locationImpactContext?.domainConditionEvaluations;
+  if (!evals) return updated;
+
+  for (const domain of Object.keys(evals) as AgentImpactDomain[]) {
+    const evalItem = evals[domain];
+    const existing = updated[domain];
+    if (!existing || !evalItem) continue;
+
+    // Attach structured condition evaluation
+    existing.conditionEvaluation = evalItem;
+
+    if (evalItem.impactClassification === 'Minimal/No Direct Impact' || evalItem.relevance === 'Minimal/No Direct Impact') {
+      // Eliminate generic "very low friction" (15, 18, 20) on unrelated domains: assign 0 friction
+      existing.score = 0;
+      existing.positiveScore = 0;
+      existing.overallSeverity = 'very_low';
+      existing.summary = `No direct interaction with ${existing.domainName || domain}. Friction: 0/100 (Minimal/No Direct Impact).`;
+      existing.negativeFindings = [];
+      existing.findings = [
+        {
+          id: `loc_cond_min_${domain}`,
+          title: `Minimal / No Direct Impact: ${existing.domainName || domain}`,
+          description: `Under verified geographic and local conditions, the proposed policy does not introduce direct operational footprint or disruption to ${existing.domainName || domain}.`,
+          severity: 'very_low',
+          sourceAgent: domain,
+          provenance: 'verified_geographic_data',
+          entityAffected: locationImpactContext?.selectedLocation || 'Local Area',
+          polarity: 'neutral',
+        },
+      ];
+    } else if (evalItem.impactClassification === 'Significant Negative' || evalItem.impactClassification === 'Potential Negative') {
+      const disruption = evalItem.impactClassification === 'Significant Negative' ? 82 : 65;
+      existing.score = Math.max(existing.score, disruption);
+      existing.positiveScore = Math.min(existing.positiveScore ?? 10, 15);
+      if (existing.score >= 70) existing.overallSeverity = 'critical';
+      else if (existing.score >= 50) existing.overallSeverity = 'high';
+      else existing.overallSeverity = 'moderate';
+      if (evalItem.negativeImpacts && evalItem.negativeImpacts.length > 0) {
+        const customFindings: ImpactFinding[] = evalItem.negativeImpacts.map((neg, idx) => ({
+          id: `loc_cond_neg_${domain}_${idx}`,
+          title: `Location Risk: ${neg.substring(0, 45)}`,
+          description: neg,
+          severity: existing.overallSeverity,
+          sourceAgent: domain,
+          provenance: 'verified_geographic_data',
+          entityAffected: locationImpactContext?.selectedLocation || 'Local Area',
+          polarity: 'negative',
+        }));
+        existing.negativeFindings = [...customFindings, ...(existing.negativeFindings || [])];
+        existing.findings = [...customFindings, ...existing.findings];
+      }
+    } else if (evalItem.impactClassification === 'Significant Positive' || evalItem.impactClassification === 'Potential Positive') {
+      const benefit = evalItem.impactClassification === 'Significant Positive' ? 80 : 65;
+      existing.positiveScore = Math.max(existing.positiveScore ?? 60, benefit);
+      if (evalItem.positiveImpacts && evalItem.positiveImpacts.length > 0) {
+        const customPosFindings: ImpactFinding[] = evalItem.positiveImpacts.map((pos, idx) => ({
+          id: `loc_cond_pos_${domain}_${idx}`,
+          title: `Location Synergy: ${pos.substring(0, 45)}`,
+          description: pos,
+          severity: 'very_low',
+          sourceAgent: domain,
+          provenance: 'verified_geographic_data',
+          entityAffected: locationImpactContext?.selectedLocation || 'Local Area',
+          polarity: 'positive',
+        }));
+        existing.positiveFindings = [...customPosFindings, ...(existing.positiveFindings || [])];
+        existing.findings = [...customPosFindings, ...existing.findings];
+      }
+    }
+  }
+  return updated;
+}
+
 export function generateGenericFallbackResult(input: ScenarioInput): SimulationResult {
   const description = input.description || 'Proposed Government Administrative Policy';
 
@@ -1792,6 +1936,15 @@ export function generateGenericFallbackResult(input: ScenarioInput): SimulationR
 
   // Real-World Geographic & Environmental Context Analysis
   const locationProfile = resolveLocationAdministrativeProfile(input);
+
+  // STEP 2: LOCATION-CONDITIONED IMPACT ANALYSIS ENGINE
+  const locAnalysis = analyzeLocationConditionedImpact(
+    proposalUnderstanding,
+    input,
+    undefined,
+    locationProfile
+  );
+  const locationImpactContext = locAnalysis.locationImpactContext;
 
   // 1. Policy Understanding with all dimensions derived from proposalUnderstanding
   const policy: PolicyUnderstanding = {
@@ -1833,17 +1986,18 @@ export function generateGenericFallbackResult(input: ScenarioInput): SimulationR
   };
 
   // 2. Generate Domain Analyses tailored to archetype with dual positive and negative findings
-  const agentAnalyses = buildArchetypeAnalyses(archetype, description, policy, loc);
-  const impactScores = computeImpactScores(agentAnalyses, intent.polarity, description, archetype, locationProfile);
+  const rawAgentAnalyses = buildArchetypeAnalyses(archetype, description, policy, loc);
+  const agentAnalyses = applyConditionEvaluationsToAnalyses(rawAgentAnalyses, locationImpactContext);
+  const impactScores = computeImpactScores(agentAnalyses, intent.polarity, description, archetype, locationProfile, locationImpactContext);
 
   // 3. Cascading Graph with both Positive Catalytic Nodes and Managed Risk Nodes
-  const cascadingGraph = buildArchetypeCascadingGraph(archetype, description, policy, loc);
+  const cascadingGraph = buildArchetypeCascadingGraph(archetype, description, policy, loc, locationImpactContext);
 
   // 4. What-If Alternatives (Original vs A, B, C)
-  const alternatives = buildArchetypeAlternatives(archetype, description, policy);
+  const alternatives = buildArchetypeAlternatives(archetype, description, policy, locationImpactContext);
 
   // 5. Explainable Recommendation
-  const recommendation = buildArchetypeRecommendation(archetype, description, policy, alternatives[1] || alternatives[0]);
+  const recommendation = buildArchetypeRecommendation(archetype, description, policy, alternatives[1] || alternatives[0], locationImpactContext);
 
   const societalBenefit = impactScores.overallSocietalBenefit ?? (intent.polarity === 'negative' ? 14 : 50);
   const isSeverelyUnfavorable =
@@ -1897,7 +2051,8 @@ export function generateGenericFallbackResult(input: ScenarioInput): SimulationR
     agentAnalyses,
     impactScores,
     intent.polarity,
-    locationProfile
+    locationProfile,
+    locationImpactContext
   );
 
   let finalDerivedPolarity: 'positive' | 'negative' | 'mixed' = 'mixed';
@@ -1966,6 +2121,7 @@ export function generateGenericFallbackResult(input: ScenarioInput): SimulationR
     netViability,
     balancedEvaluation,
     locationContextAnalysis: locationProfile,
+    locationImpactContext,
     proposalUnderstanding,
     disclaimer: MANDATORY_DISCLAIMER,
     populationContext: (() => {
@@ -5006,12 +5162,262 @@ function buildIndustrialCascadingGraph(
   };
 }
 
+function buildLocationConflictCascadingGraph(
+  description: string,
+  policy: PolicyUnderstanding,
+  locationImpactContext: LocationImpactContext
+): CascadingGraph {
+  const receptorsList = locationImpactContext.sensitiveReceptors?.map(r => r.name).join(', ') || 'Agricultural Lands & River Catchment';
+  return {
+    primaryChainSummary: 'Proposal Sited in Incompatible Location → Direct Encroachment on Sensitive Receptors → Irreversible Agrarian & Ecological Disruption → Agrarian Protests & Legal PIL Injunctions → Administrative Stalemate / High Friction Halt',
+    nodes: [
+      {
+        id: 'node_1',
+        label: 'Proposal Sited in Incompatible Location',
+        description: `Proposal to construct facility: "${description}" at ${locationImpactContext.selectedLocation}, conflicting directly with sensitive baseline receptors.`,
+        cause: 'Location selection without spatial zoning conformity or sensitive receptor buffer screening',
+        effect: 'Triggers severe land-use friction and violation of statutory spatial planning guidelines.',
+        severity: 'critical',
+        confidence: 95,
+        department: policy.department,
+        type: 'decision',
+        polarity: 'negative',
+      },
+      {
+        id: 'node_2',
+        label: 'Direct Encroachment on Sensitive Receptors',
+        description: `Project footprint and toxic effluent/emission pathways intersect directly with ${receptorsList}.`,
+        cause: 'Lack of statutory buffer zones separating industrial activities from cultivable farmlands, water bodies, and settlements',
+        effect: 'Threatens topsoil contamination, aquifer toxic runoff, and public health endangerment.',
+        severity: 'critical',
+        confidence: 94,
+        department: 'Environment & Climate Change / TNPCB',
+        type: 'direct_effect',
+        polarity: 'negative',
+      },
+      {
+        id: 'node_3',
+        label: 'Severe Agrarian & Ecological Disruption',
+        description: 'Permanent destruction of multi-crop agricultural cultivation, loss of farmer livelihoods, and acute water security risks.',
+        cause: 'Hazardous industrial emissions, trade effluent discharge, and conversion of high-yield cultivable land',
+        effect: 'Eliminates agrarian income stability and pollutes regional riverine food web.',
+        severity: 'critical',
+        confidence: 92,
+        department: 'Agriculture and Farmers Welfare',
+        type: 'secondary_effect',
+        polarity: 'negative',
+      },
+      {
+        id: 'node_4',
+        label: 'Agrarian Protests & High Court Legal Injunctions',
+        description: 'Farmers associations, local grama sabhas, and civil society groups mobilize protests and file Public Interest Litigations (PILs).',
+        cause: 'Violation of statutory safeguards and direct threat to rural agricultural livelihoods',
+        effect: 'Madras High Court / National Green Tribunal (NGT) issues judicial stay order halting site mobilization.',
+        severity: 'critical',
+        confidence: 96,
+        department: 'Revenue and Disaster Management / Law',
+        type: 'service_impact',
+        polarity: 'negative',
+      },
+      {
+        id: 'node_5',
+        label: 'Administrative Stalemate & Stranded Capital',
+        description: 'Project halted under court stay; administrative friction peaks (82-95/100) with negligible realized societal gain.',
+        cause: 'Judicial stay orders, sustained public opposition, and failure of statutory environmental clearance',
+        effect: 'Administration forced to consider project cancellation or site relocation to approved SIPCOT industrial estate.',
+        severity: 'critical',
+        confidence: 95,
+        department: 'Chief Secretariat / Administrative Reforms',
+        type: 'critical_consequence',
+        polarity: 'negative',
+      },
+    ],
+    edges: [
+      { id: 'loc_e1_2', source: 'node_1', target: 'node_2', label: 'Encroaches Upon Sensitive Receptors' },
+      { id: 'loc_e2_3', source: 'node_2', target: 'node_3', label: 'Triggers Agricultural & River Contamination' },
+      { id: 'loc_e3_4', source: 'node_3', target: 'node_4', label: 'Mobilizes Agrarian Protests & Legal PILs' },
+      { id: 'loc_e4_5', source: 'node_4', target: 'node_5', label: 'Causes Judicial Stay & Administrative Stalemate' },
+    ],
+  };
+}
+
+function buildConformingIndustrialCascadingGraph(
+  description: string,
+  policy: PolicyUnderstanding,
+  locationImpactContext: LocationImpactContext
+): CascadingGraph {
+  return {
+    primaryChainSummary: 'Siting in Approved Industrial Estate → Pre-Existing Buffer & Infrastructure Utilization → Common Effluent Treatment & Standard CTE → Supply Chain Synergy & Industrial Expansion → Stable Operational Commissioning',
+    nodes: [
+      {
+        id: 'node_1',
+        label: 'Siting in Approved Industrial Park',
+        description: `Proposal established within designated industrial estate: "${description}" at ${locationImpactContext.selectedLocation}.`,
+        cause: 'Policy compliance by selecting pre-zoned industrial land with conforming land use',
+        effect: 'Zero encroachment on fertile agricultural lands, residential clusters, or drinking water reservoirs.',
+        severity: 'very_low',
+        confidence: 96,
+        department: policy.department,
+        type: 'decision',
+        polarity: 'positive',
+      },
+      {
+        id: 'node_2',
+        label: 'Estate Buffer & Industrial Infrastructure Utilization',
+        description: 'Utilizes estate heavy-haul roads, dedicated 33kV power feeders, and statutory green belt buffer zones.',
+        cause: 'Established industrial estate master plan providing physical isolation from civic settlements',
+        effect: 'Shields surrounding communities from industrial noise, freight traffic, and localized emissions.',
+        severity: 'low',
+        confidence: 93,
+        department: 'Industries, Investment Promotion and Commerce',
+        type: 'direct_effect',
+        polarity: 'positive',
+      },
+      {
+        id: 'node_3',
+        label: 'CETP Effluent Processing & Standard CTE Compliance',
+        description: 'Industrial trade effluent routed directly to Common Effluent Treatment Plant (CETP) with Zero Liquid Discharge (ZLD) protocol.',
+        cause: 'Compliance with TNPCB industrial estate environmental clearance mandates',
+        effect: 'Prevents untread discharge and protects regional surface and groundwater resources.',
+        severity: 'moderate',
+        confidence: 90,
+        department: 'Tamil Nadu Pollution Control Board (TNPCB)',
+        type: 'secondary_effect',
+        polarity: 'neutral',
+      },
+      {
+        id: 'node_4',
+        label: 'Manufacturing Output & Supply Chain Synergies',
+        description: 'Facility integrates with upstream chemical suppliers and downstream manufacturing units within the corridor.',
+        cause: 'Cluster economics and industrial agglomeration advantages',
+        effect: 'Generates potential employment and commercial logistics demand with contained operational friction.',
+        severity: 'low',
+        confidence: 88,
+        department: 'Highways and Minor Ports / Industries',
+        type: 'service_impact',
+        polarity: 'positive',
+      },
+      {
+        id: 'node_5',
+        label: 'Predictable Commissioning under Standard Regulations',
+        description: 'Project commissioned with manageable administrative friction (~36-46/100) and structured statutory monitoring.',
+        cause: 'Full alignment with spatial zoning, legal mandates, and environmental standards',
+        effect: 'Orderly industrial expansion without civic backlash or judicial injunctions.',
+        severity: 'low',
+        confidence: 92,
+        department: 'State Planning Commission / Industries',
+        type: 'critical_consequence',
+        polarity: 'positive',
+      },
+    ],
+    edges: [
+      { id: 'conf_e1_2', source: 'node_1', target: 'node_2', label: 'Leverages Established Buffers & Utilities' },
+      { id: 'conf_e2_3', source: 'node_2', target: 'node_3', label: 'Ensures Centralized CETP Effluent Treatment' },
+      { id: 'conf_e3_4', source: 'node_3', target: 'node_4', label: 'Enables Integrated Supply Chain Operations' },
+      { id: 'conf_e4_5', source: 'node_4', target: 'node_5', label: 'Achieves Orderly Statutory Commissioning' },
+    ],
+  };
+}
+
+function buildConformingGovernmentComplexCascadingGraph(
+  description: string,
+  policy: PolicyUnderstanding,
+  locationImpactContext: LocationImpactContext
+): CascadingGraph {
+  return {
+    primaryChainSummary: 'Government Complex Approved in Designated Civic Zone → Inter-Departmental Consolidation → Streamlined Citizen Service Delivery → Zero Agricultural/Ecological Disruption → High Administrative Modernization & Efficiency',
+    nodes: [
+      {
+        id: 'node_1',
+        label: 'Administrative Complex Sited in Designated Civic Zone',
+        description: `Consolidated administrative complex sanctioned in conforming government zone at ${locationImpactContext.selectedLocation}.`,
+        cause: 'Policy decision to co-locate district/municipal offices on designated institutional land',
+        effect: 'Eliminates agricultural conversion, zero residential displacement, and zero water catchment disruption.',
+        severity: 'very_low',
+        confidence: 96,
+        department: policy.department,
+        type: 'decision',
+        polarity: 'positive',
+      },
+      {
+        id: 'node_2',
+        label: 'Inter-Departmental Office Consolidation',
+        description: 'Revenue, Public Works, Municipal Administration, and Welfare departments unified under single civic master facility.',
+        cause: 'Architectural consolidation of fragmented departmental taluk and district branches',
+        effect: 'Eliminates inter-office transit latency and drastically cuts municipal courier and dispatch overhead.',
+        severity: 'very_low',
+        confidence: 94,
+        department: 'Public Works Department (Buildings)',
+        type: 'direct_effect',
+        polarity: 'positive',
+      },
+      {
+        id: 'node_3',
+        label: 'Single-Window Citizen Service Delivery',
+        description: 'Integrated citizen service counters, digital e-Sevai portals, and unified grievance redressal center operationalized.',
+        cause: 'Centralized administrative infrastructure and modern civic facilities',
+        effect: 'Reduces citizen travel distance, waiting times, and transaction costs by ~65%.',
+        severity: 'low',
+        confidence: 95,
+        department: 'Information Technology and Digital Services',
+        type: 'secondary_effect',
+        polarity: 'positive',
+      },
+      {
+        id: 'node_4',
+        label: 'Civic Utility & Transit Integration',
+        description: 'Direct feeder bus connectivity, multi-level visitor parking, and rainwater harvesting integrated into site design.',
+        cause: 'Comprehensive municipal urban transport and infrastructure coordination',
+        effect: 'Absorbs daily public visitor footfall without burdening adjoining residential streets.',
+        severity: 'low',
+        confidence: 91,
+        department: 'Transport Department / Municipal Administration',
+        type: 'service_impact',
+        polarity: 'positive',
+      },
+      {
+        id: 'node_5',
+        label: 'Elevated Governance Efficiency & Administrative Modernization',
+        description: 'High net benefit with minimal execution friction (0 friction in unrelated domains like agriculture and education).',
+        cause: 'Conforming institutional siting with robust inter-agency coordination',
+        effect: 'Substantial boost in public service delivery and long-term administrative productivity.',
+        severity: 'very_low',
+        confidence: 95,
+        department: 'Personnel and Administrative Reforms',
+        type: 'critical_consequence',
+        polarity: 'positive',
+      },
+    ],
+    edges: [
+      { id: 'gov_e1_2', source: 'node_1', target: 'node_2', label: 'Enables Structural Inter-Agency Consolidation' },
+      { id: 'gov_e2_3', source: 'node_2', target: 'node_3', label: 'Centralizes Public Citizen Access' },
+      { id: 'gov_e3_4', source: 'node_3', target: 'node_4', label: 'Coordinates Multimodal Public Transit' },
+      { id: 'gov_e4_5', source: 'node_4', target: 'node_5', label: 'Delivers Maximum Governance Modernization' },
+    ],
+  };
+}
+
 function buildArchetypeCascadingGraph(
   archetype: PolicyArchetype,
   description: string,
   policy: PolicyUnderstanding,
-  location: string
+  location: string,
+  locationImpactContext?: LocationImpactContext
 ): CascadingGraph {
+  if (locationImpactContext?.locationCompatibilityClassification === 'High Conflict / Incompatible') {
+    return buildLocationConflictCascadingGraph(description, policy, locationImpactContext);
+  }
+
+  const isGovComplex = /(government complex|administrative complex|collectorate|secretariat|civic center|taluk office)/i.test(description);
+  if (isGovComplex && (locationImpactContext?.locationCompatibilityClassification === 'Highly Compatible' || /(government zone|civic zone|administrative zone|institutional)/i.test(location))) {
+    return buildConformingGovernmentComplexCascadingGraph(description, policy, locationImpactContext || ({ selectedLocation: location } as any));
+  }
+
+  const isIndustrial = /(factory|textile|manufacturing|industrial|refinery|chemical|cement|smelter|tannery|processing plant|workshop)/i.test(description) || archetype === 'industrial_zone';
+  if (isIndustrial && (locationImpactContext?.locationCompatibilityClassification === 'Highly Compatible' || /(sipcot|sidco|industrial park|industrial estate|industrial corridor)/i.test(location))) {
+    return buildConformingIndustrialCascadingGraph(description, policy, locationImpactContext || ({ selectedLocation: location } as any));
+  }
+
   if (archetype === 'agricultural_destruction_hazard') {
     return buildAgriculturalCascadingGraph(description, policy, location);
   }
@@ -5482,15 +5888,118 @@ function buildGeneralDestructiveAlternatives(
   ];
 }
 
-// ------------------------------------------------------------------------------------------------
-// What-If Alternatives Builder
-// ------------------------------------------------------------------------------------------------
+function buildLocationConflictAlternatives(
+  description: string,
+  policy: PolicyUnderstanding,
+  locationImpactContext: LocationImpactContext
+): AlternativeStrategy[] {
+  const receptors = locationImpactContext.sensitiveReceptors?.map(r => r.name).join(', ') || 'Fertile Farmland & River';
+  return [
+    {
+      id: 'opt_original',
+      title: `Original Proposal at ${locationImpactContext.selectedLocation} (High Conflict)`,
+      optionType: 'Current Site Selection (High Risk / Incompatible)',
+      description: `Proceed with "${description}" at the proposed site despite critical spatial overlap with ${receptors}.`,
+      advantages: [
+        'Adheres strictly to the applicant/promoter requested site boundary without initial re-filing',
+        'Potential localized capital investment if approvals could hypothetically be granted',
+      ],
+      disadvantages: [
+        `Direct irreversible destruction and toxic pollution hazard to ${receptors}`,
+        'Intense resistance from farmers and local communities leading to inevitable mass agitation',
+        'Imminent judicial stay injunctions from National Green Tribunal (NGT) or High Court',
+        'Non-compliance with TNPCB environmental setback buffer regulations',
+      ],
+      mitigations: [
+        'Not viable under standard legal and environmental protections without site restructuring',
+      ],
+      cost: '₹ Baseline Capital Outlay (High litigation & stay risk)',
+      implementationDifficulty: 'Extreme',
+      overallRisk: 'critical',
+      recommendationStatus: 'Baseline / Proposed',
+      scores: { transport: 40, economy: 30, environment: 12, safety: 18, population: 20, overall: 24 },
+    },
+    {
+      id: 'opt_a',
+      title: 'Alternative A: Relocate to Designated Industrial Estate (SIPCOT / SIDCO Industrial Corridor)',
+      optionType: 'Site Relocation to Conforming Industrial Zone (AI Recommended)',
+      description: 'Relocate the entire proposed manufacturing/industrial facility to an approved SIPCOT or SIDCO industrial complex with pre-existing heavy infrastructure and environmental clearances.',
+      advantages: [
+        '100% preservation of fertile agricultural lands, farmer livelihoods, and natural water bodies',
+        'Pre-approved industrial zoning eliminates land acquisition disputes and zoning conversion delays',
+        'Immediate access to Common Effluent Treatment Plant (CETP), high-capacity water lines, and 33kV industrial power',
+        'Mandatory 500m green buffer zone established away from residential settlements',
+      ],
+      disadvantages: [
+        'Requires standard SIPCOT industrial plot allotment procedure (~45-60 days administrative lead time)',
+        'Standard industrial park leasehold / infrastructure development charges',
+      ],
+      mitigations: [
+        'Fast-track Single Window clearance via Guidance Tamil Nadu',
+        'Facilitate expedited industrial plot handover in the nearest operational SIPCOT park',
+      ],
+      cost: '₹ Baseline + 4% (Standard Estate Siting)',
+      implementationDifficulty: 'Moderate',
+      overallRisk: 'low',
+      recommendationStatus: 'Recommended',
+      scores: { transport: 82, economy: 85, environment: 78, safety: 86, population: 84, overall: 83 },
+    },
+    {
+      id: 'opt_b',
+      title: 'Alternative B: Mandatory On-Site Buffer Expansion & Zero Liquid Discharge (ZLD) Mandate',
+      optionType: 'On-Site Precautionary Engineering Safeguards',
+      description: 'If site cannot be relocated, mandate a 1,000-meter multi-tier green bio-shield buffer, 100% Zero Liquid Discharge (ZLD) closed-loop effluent treatment, and exclusion of all cultivable parcels.',
+      advantages: [
+        'Strictly confines trade effluent and air emissions within facility perimeter without river discharge',
+        'Preserves cultivable parcels within site boundary under mandatory agrarian easements',
+      ],
+      disadvantages: [
+        '+25% capital expenditure for advanced MVR (Mechanical Vapor Recompression) ZLD system',
+        'Reduces usable commercial plot footprint by ~40% due to expanded green belt covenants',
+      ],
+      mitigations: [
+        'Mandate continuous online effluent monitoring connected to TNPCB Water Quality Care Centre',
+        'Provide bank guarantee for environmental performance before commissioning',
+      ],
+      cost: '₹ Baseline + 25% (Advanced ZLD & Buffer)',
+      implementationDifficulty: 'High',
+      overallRisk: 'moderate',
+      recommendationStatus: 'Secondary Option',
+      scores: { transport: 58, economy: 62, environment: 68, safety: 72, population: 64, overall: 65 },
+    },
+    {
+      id: 'opt_c',
+      title: 'Alternative C: Multi-Agency Environmental Due Diligence & Precautionary Pilot',
+      optionType: 'Conditional Precautionary Review',
+      description: 'Withhold all final construction clearances pending a joint field inspection by Department of Agriculture, TNPCB, and Water Resources Department, combined with mandatory public hearing.',
+      advantages: [
+        'Ensures full administrative transparency and prevents irreversible environmental degradation',
+        'Engages local agrarian and community stakeholders before financial capital is stranded',
+      ],
+      disadvantages: [
+        'Delays project timeline by 6-9 months for comprehensive EIA baseline monitoring and public hearing',
+      ],
+      mitigations: [
+        'Publish transparent environmental data and air/water modeling reports online for public review',
+      ],
+      cost: '₹ Baseline + 2% (EIA & Consultation)',
+      implementationDifficulty: 'Moderate',
+      overallRisk: 'moderate',
+      recommendationStatus: 'Contingency',
+      scores: { transport: 52, economy: 50, environment: 72, safety: 70, population: 68, overall: 62 },
+    },
+  ];
+}
 
 function buildArchetypeAlternatives(
   archetype: PolicyArchetype,
   description: string,
-  policy: PolicyUnderstanding
+  policy: PolicyUnderstanding,
+  locationImpactContext?: LocationImpactContext
 ): AlternativeStrategy[] {
+  if (locationImpactContext?.locationCompatibilityClassification === 'High Conflict / Incompatible') {
+    return buildLocationConflictAlternatives(description, policy, locationImpactContext);
+  }
   if (archetype === 'agricultural_destruction_hazard') {
     return buildAgriculturalAlternatives(description, policy);
   }
@@ -5691,16 +6200,60 @@ function buildArchetypeAlternatives(
   ];
 }
 
-// ------------------------------------------------------------------------------------------------
-// Explainable Recommendation Builder
-// ------------------------------------------------------------------------------------------------
+function buildLocationConflictRecommendation(
+  description: string,
+  policy: PolicyUnderstanding,
+  locationImpactContext: LocationImpactContext,
+  recommendedOption: AlternativeStrategy
+): DecisionRecommendation {
+  const receptors = locationImpactContext.sensitiveReceptors?.map(r => `${r.name} (${r.type})`).join(', ') || 'Fertile Farmland & River';
+  return {
+    title: 'Executive Decision Advisory: REJECT Proposed Site — Adopt Alternative A (SIPCOT Relocation)',
+    recommendedOptionId: recommendedOption.id,
+    recommendedOptionTitle: recommendedOption.title,
+    why: `The proposed site exhibits severe location incompatibility (Location Compatibility Score: ${locationImpactContext.locationCompatibilityScore}/100 — High Conflict / Incompatible). Siting "${description}" at this location directly threatens ${receptors}, causing irreversible agricultural loss, severe river contamination hazard, and imminent agrarian litigation. Relocating to an approved SIPCOT/SIDCO industrial corridor (Alternative A) delivers the intended industrial objectives without destroying fertile farmlands or triggering public revolt.`,
+    summary: `Administrative simulation confirms that location-specific conditions heavily depress net viability. Potential commercial employment is counterbalanced and overwhelmed by acute environmental non-compliance and social friction (${locationImpactContext.compatibilityRationale}). The state administration must NOT issue Consent to Establish (CTE) for this unzoned location, but rather steer the investment into a conforming industrial park.`,
+    benefits: [
+      '100% preservation of fertile multi-crop agricultural land and regional food security',
+      'Protects river basin and groundwater aquifers from hazardous industrial trade effluent',
+      'Eliminates threat of agrarian unrest, farmer blockades, and High Court stay injunctions',
+      'Accelerates project commissioning by ~8 months by utilizing pre-approved SIPCOT industrial zoning',
+    ],
+    risks: [
+      `Attempting execution at the current site guarantees high friction (82-95/100) and legal stay orders`,
+      'Permanent degradation of agrarian livelihoods and rural topsoil',
+      'Severe statutory non-compliance under Water (Prevention & Control of Pollution) Act 1974',
+    ],
+    mitigations: [
+      'Issue formal executive directive rejecting current siting on fertile agricultural/riverine land',
+      'Direct State Industries Promotion Corporation (SIPCOT) to allocate an equivalent industrial parcel in the nearest conforming complex',
+      'Mandate Zero Liquid Discharge (ZLD) and continuous emission monitoring systems (CEMS) at the alternative site',
+    ],
+    precautions: [
+      'Prohibit piecemeal conversion of cultivable agricultural parcels for non-conforming industrial use',
+      'Ensure strict 500-meter statutory buffer distance from all human settlements and water bodies',
+    ],
+    confidence: typeof locationImpactContext.confidence === 'number' ? locationImpactContext.confidence : 88,
+    assumptions: [
+      'SIPCOT industrial estate has operational capacity and CETP connectivity available',
+      'Promoter is eligible for state single-window industrial relocation incentives',
+    ],
+    dataLimitations: [
+      'Site proximity to specific water bodies and agrarian parcels verified via location profile; ground cadastral survey recommended prior to final alternative allotment.',
+    ],
+  };
+}
 
 function buildArchetypeRecommendation(
   archetype: PolicyArchetype,
   description: string,
   policy: PolicyUnderstanding,
-  recommendedOption: AlternativeStrategy
+  recommendedOption: AlternativeStrategy,
+  locationImpactContext?: LocationImpactContext
 ): DecisionRecommendation {
+  if (locationImpactContext?.locationCompatibilityClassification === 'High Conflict / Incompatible') {
+    return buildLocationConflictRecommendation(description, policy, locationImpactContext, recommendedOption);
+  }
   if (archetype === 'agricultural_destruction_hazard') {
     return buildAgriculturalRecommendation(description, policy, recommendedOption);
   }
@@ -6083,3 +6636,5 @@ function determineUrgency(description: string): 'Low' | 'Standard' | 'Urgent' | 
   }
   return 'Standard';
 }
+
+export const generateFallbackResult = generateGenericFallbackResult;
