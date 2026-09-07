@@ -299,6 +299,7 @@ export const SimulationResultsPage: React.FC<SimulationResultsPageProps> = ({
         <PolicyUnderstandingCard
           policy={policy}
           populationContext={simulation.populationContext}
+          locationContextAnalysis={simulation.locationContextAnalysis}
         />
       )}
 

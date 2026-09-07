@@ -19,6 +19,10 @@ import {
   buildBalancedDecisionEvaluation,
   computeFrameworkGainAndFriction,
 } from './demoFallback.js';
+import {
+  resolveLocationAdministrativeProfile,
+  LocationAdministrativeContext,
+} from './locationContextData.js';
 import { findInfrastructure, InfrastructureLookupResult } from './infrastructure.js';
 import { AgentRegistry } from './agents/registry.js';
 import { classifyPolicy } from './agents/implementations.js';
@@ -35,6 +39,8 @@ export async function runGeminiSimulation(input: ScenarioInput): Promise<Simulat
     input.locationName
   );
 
+  const locationProfile = resolveLocationAdministrativeProfile(input);
+
   if (!apiKey || apiKey.trim() === '' || apiKey.includes('your_gemini_api_key')) {
     console.log('[Gemini Engine] No valid GEMINI_API_KEY found. Utilizing dynamic fallback mode.');
     return getFallbackSimulation(input, infrastructureData);
@@ -42,7 +48,7 @@ export async function runGeminiSimulation(input: ScenarioInput): Promise<Simulat
 
   try {
     const ai = new GoogleGenAI({ apiKey });
-    const prompt = buildOrchestrationPrompt(input, infrastructureData);
+    const prompt = buildOrchestrationPrompt(input, infrastructureData, locationProfile);
 
     let jsonText = '';
     const modelsToTry = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
@@ -79,7 +85,7 @@ export async function runGeminiSimulation(input: ScenarioInput): Promise<Simulat
     }
 
     const parsed = JSON.parse(jsonText);
-    return formatGeminiResponseToSimulationResult(parsed, input, infrastructureData);
+    return formatGeminiResponseToSimulationResult(parsed, input, infrastructureData, locationProfile);
   } catch (error: any) {
     console.warn('[Gemini Engine] Live Gemini analysis failed. Utilizing dynamic fallback simulation:', error?.message || error);
     return getFallbackSimulation(input, infrastructureData);
@@ -106,12 +112,38 @@ function getFallbackSimulation(input: ScenarioInput, infrastructureData: Infrast
   };
 }
 
-function buildOrchestrationPrompt(input: ScenarioInput, infra: InfrastructureLookupResult): string {
+function buildOrchestrationPrompt(
+  input: ScenarioInput,
+  infra: InfrastructureLookupResult,
+  locContext?: LocationAdministrativeContext
+): string {
   const locationTitle = [infra.resolvedArea, input.town || input.city, input.district, 'Tamil Nadu'].filter(Boolean).join(', ');
   const targetAsset = input.selectedAsset || input.description;
   const inferredCategory = classifyPolicy(input.description, input.department);
 
-  return `You are a neutral Administrative Decision Impact Agent evaluating proposed administrative decisions in Tamil Nadu, India. You are strictly NOT a policy promoter or advocate.
+  return `You are an experienced Municipal Administration Decision Analyst whose responsibility is to protect public welfare, environmental sustainability, legal compliance, and efficient municipal governance. You must never act like a project promoter, investment advisor, marketing assistant, or policy supporter. Every proposal must be critically evaluated with neutrality, caution, and evidence-based administrative reasoning.
+
+FOUR INTERDEPENDENT EVALUATION INPUTS:
+1. THE PROPOSAL: Literal meaning only. Zero assumed benefits.
+2. THE SELECTED LOCATION: "${locationTitle}" (District: ${locContext?.district || input.district || 'Tamil Nadu'}, Area: ${locContext?.resolvedArea || infra.resolvedArea})
+3. REAL-WORLD CONTEXTUAL INFORMATION:
+   - Zoning Classification: ${locContext?.zoningClassification || 'Suburban Mixed'}
+   - Approved Industrial Estate: ${locContext?.isApprovedIndustrialZone ? 'YES (SIPCOT/SIDCO zoned with CETP and buffer)' : 'NO'}
+   - Agricultural / Farmland Belt: ${locContext?.isAgriculturalOrRuralZone ? 'YES (Active crop cultivation / agrarian tract)' : 'NO'}
+   - Water Body / Eco-Buffer: ${locContext?.isEcoSensitiveOrWaterBuffer ? 'YES (Sensitive water body / catchment buffer)' : 'NO'}
+   - High-Density Residential: ${locContext?.isHighDensityResidential ? 'YES (Dense residential wards / settlements)' : 'NO'}
+   - Nearby Water Bodies: ${locContext?.nearbyWaterBodies?.join(', ') || 'Regional drainage network'}
+   - Primary Livelihoods: ${locContext?.primaryLivelihoods?.join(', ') || 'Agrarian and trade employment'}
+   - Vulnerabilities: ${locContext?.disasterVulnerabilities?.join('; ') || 'Standard seasonal hazards'}
+   - Statutory Regimes: ${locContext?.applicableStatutoryFrameworks?.join('; ') || 'Standard municipal regulations'}
+   - High-Risk Actions Detected: ${locContext?.highRiskActionsDetected?.join(', ') || 'None'}
+   - Context Summary: ${locContext?.contextualAnalysisSummary || 'Standard municipal baseline'}
+4. MUNICIPAL ADMINISTRATIVE REASONING:
+   - Same proposal MUST yield different results in different locations:
+     * Factory inside approved industrial estate (SIPCOT/SIDCO): Moderate Benefit (Gain 48–54), Manageable Risk (Friction 40–48).
+     * Same factory in farmland/river basin/residential: Significantly higher environmental & social risk (Gain 18–30, Friction 78–92).
+     * Dam flood water release: Gain 75–85, Friction 20–30. Dam drought water diversion: Gain 10–20, Friction 90–98.
+     * Road widening on vacant bypass: Gain 70–80, Friction 24–34. Road widening in dense residential/bazaar street: Gain 25–35, Friction 82–94.
 
 PRIMARY SOURCE OF TRUTH MANDATE (STRICT RULES):
 The user's proposal must be treated as the PRIMARY SOURCE OF TRUTH.
@@ -127,11 +159,6 @@ The user's proposal must be treated as the PRIMARY SOURCE OF TRUTH.
 7. If a domain has no meaningful connection to the proposal (for example, a textile factory proposal has no direct connection to Education, Disaster Resilience, Healthcare, or Public Safety), return:
    "Minimal/No Direct Impact"
    instead of inventing a benefit. Set positiveScore to 0 and state that the domain has no direct connection to the proposal.
-8. MOST IMPORTANT SCORING CHANGE:
-   - The Societal Benefit score must NOT represent the potential economic value of the project alone. It must represent the overall societal impact of the ACTUAL PROPOSAL.
-   - For an industrial project without explicit societal/environmental commitments (e.g. "Construct a textile factory near Tiruppur"), Societal Benefit must be Low to Moderate (35-48/100, labeled as Potential), and Execution Risk must be Moderate (52-65/100) reflecting effluent, water consumption, and zoning clearances.
-   - Do NOT allow a generic industrial-project template to produce high scores automatically.
-   - For proposals with explicit major negative impacts (e.g. "Relocate 500 families for cement factory"), Societal Benefit MUST be <= 25 and Execution Risk MUST be >= 75-96. Potential economic benefits must NOT override explicit negative impacts.
 
 Analyze this proposed administrative decision in Tamil Nadu, India:
 GEOGRAPHIC CONTEXT (Background Municipal Vicinity only; do NOT assume proposal affects these unless specified):
@@ -376,7 +403,8 @@ JSON OUTPUT SCHEMA MUST BE STRICTLY COMPLIANT WITH THIS STRUCTURE.`;
 function formatGeminiResponseToSimulationResult(
   parsed: any,
   input: ScenarioInput,
-  infra: InfrastructureLookupResult
+  infra: InfrastructureLookupResult,
+  locContext?: LocationAdministrativeContext
 ): SimulationResult {
   const locationTitle = [infra.resolvedArea, input.town || input.city, input.district, 'Tamil Nadu'].filter(Boolean).join(', ');
   const targetAsset = input.selectedAsset || input.description;
@@ -438,7 +466,8 @@ function formatGeminiResponseToSimulationResult(
     agentAnalyses,
     semanticIntent.polarity === 'negative' ? 'negative' : rawPolarity,
     input.description,
-    semanticIntent.archetype
+    semanticIntent.archetype,
+    locContext
   );
 
   let gainScore = typeof parsed.gainScore === 'number' ? parsed.gainScore : framework.gainScore;
@@ -655,8 +684,10 @@ function formatGeminiResponseToSimulationResult(
       policy,
       agentAnalyses,
       impactScores,
-      finalPolarity
+      finalPolarity,
+      locContext
     ),
+    locationContextAnalysis: locContext,
     disclaimer: MANDATORY_DISCLAIMER,
   };
 }

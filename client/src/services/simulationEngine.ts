@@ -20,6 +20,10 @@ import {
   getGainClassification,
   getFrictionClassification,
 } from '../types/index.js';
+import {
+  resolveLocationAdministrativeProfile,
+  LocationAdministrativeContext,
+} from '../data/locationContextData.js';
 
 export const MANDATORY_DISCLAIMER =
   'This platform provides AI-assisted simulations for decision support only. Results are based on available information, assumptions, and heuristic reasoning. Final decisions should be made by qualified government authorities using official data and expert evaluation.';
@@ -328,7 +332,8 @@ export function computeFrameworkGainAndFriction(
   analyses: Record<AgentImpactDomain, AgentAnalysis>,
   hintPolarity?: 'positive' | 'negative' | 'mixed',
   description: string = '',
-  archetype?: PolicyArchetype
+  archetype?: PolicyArchetype,
+  locationContext?: LocationAdministrativeContext
 ): {
   gainScore: number;
   gainClassification: GainClassification;
@@ -424,6 +429,67 @@ export function computeFrameworkGainAndFriction(
     gainIncreases.push(`enhanced community quality of life (+${boost})`);
   }
 
+  // Context-Aware Administrative Adjustments for Gain
+  if (locationContext) {
+    if (locationContext.isApprovedIndustrialZone && isIndustrialManufacturing && !hasDisplacement && !hasAgriLoss) {
+      const boost = 8;
+      gain += boost;
+      gainIncreases.push(`situated within an approved industrial estate (${locationContext.municipalInfrastructureBaseline[0] || 'SIPCOT/SIDCO'}) with dedicated infrastructure (+${boost})`);
+    } else if (locationContext.isAgriculturalOrRuralZone && (isIndustrialManufacturing || /(factory|industrial|zone|plant)/i.test(descLower))) {
+      const penalty = 16;
+      gain -= penalty;
+      gainDecreases.push(`industrial encroachment into active agricultural belt of ${locationContext.district} (-${penalty})`);
+    }
+
+    if (locationContext.isEcoSensitiveOrWaterBuffer && (isIndustrialManufacturing || hasSeverePollution || /(factory|plant|effluent|dyeing)/i.test(descLower))) {
+      const waterName = locationContext.nearbyWaterBodies[0] || 'sensitive water catchment';
+      const penalty = 14;
+      gain -= penalty;
+      gainDecreases.push(`effluent and groundwater stress near ${waterName} (-${penalty})`);
+    }
+
+    if (locationContext.isHighDensityResidential && (isIndustrialManufacturing || hasSeverePollution || /(factory|plant|dust|noise)/i.test(descLower))) {
+      const penalty = 12;
+      gain -= penalty;
+      gainDecreases.push(`proximity to high-density residential wards and civic institutions (-${penalty})`);
+    }
+
+    if (locationContext.highRiskActionsDetected.length > 0) {
+      const actions = locationContext.highRiskActionsDetected;
+      const penalty = Math.min(22, actions.length * 7);
+      gain -= penalty;
+      gainDecreases.push(`enhanced risk triggers for administrative actions (${actions.join(', ')}) (-${penalty})`);
+    }
+
+    // Dam / Water Release Context: Flood vs Drought
+    const isWaterAction = /(dam|water release|excess water|sluice|canal|reservoir|water block|divert water)/i.test(descLower);
+    if (isWaterAction) {
+      if (/(flood|monsoon|surplus|precaution|excess flow|storage safety|heavy inflow)/i.test(descLower)) {
+        const boost = 26;
+        gain += boost;
+        gainIncreases.push(`proactive flood safety and downstream settlement inundation prevention (+${boost})`);
+      } else if (/(drought|dry|scarcity|block|divert|deprive|shut canal)/i.test(descLower)) {
+        const penalty = 26;
+        gain -= penalty;
+        gainDecreases.push(`depriving downstream irrigation canal network of vital water during drought (-${penalty})`);
+      }
+    }
+
+    // Road Widening Context: Vacant Bypass vs Densely Populated Neighborhood
+    const isRoadAction = /(widen|widening|road expansion|corridor expansion|highway)/i.test(descLower);
+    if (isRoadAction) {
+      if (/(vacant|bypass|outer ring|peripheral|unoccupied|open land)/i.test(descLower)) {
+        const boost = 18;
+        gain += boost;
+        gainIncreases.push(`corridor capacity expansion along vacant/bypass right-of-way (+${boost})`);
+      } else if (/(dense|residential|bazaar|market|shop|demolish|evict|relocate|commercial street)/i.test(descLower) || locationContext.isHighDensityResidential) {
+        const penalty = 20;
+        gain -= penalty;
+        gainDecreases.push(`demolition of commercial frontages, tenant displacement & disruption in dense urban core (-${penalty})`);
+      }
+    }
+  }
+
   // Negative Factors (-)
   // 1. Destruction of agricultural land
   if (hasAgriLoss) {
@@ -481,12 +547,25 @@ export function computeFrameworkGainAndFriction(
     gainDecreases.push(`poor long-term sustainability & legal compliance friction (-${penalty})`);
   }
 
-  // STRICT DECISION RULES FOR GAIN:
-  // "The Societal Benefit score must NOT represent the potential economic value of the project alone. It must represent the overall societal impact of the ACTUAL PROPOSAL."
-  if ((hasDisplacement && (hasSeverePollution || /(cement|chemical|factory|industrial|plant)/i.test(descLower))) || (hasAgriLoss && /(destroy|destruction|conversion|demolish)/i.test(descLower))) {
+  // STRICT CONTEXT-AWARE DECISION RULES FOR GAIN:
+  if (locationContext?.isApprovedIndustrialZone && isIndustrialManufacturing && !hasDisplacement && !hasAgriLoss) {
+    gain = Math.max(48, Math.min(54, gain));
+  } else if ((locationContext?.isAgriculturalOrRuralZone || /(farmland|agricultural|crop|fertile)/i.test(descLower)) && isIndustrialManufacturing && !hasDisplacement) {
+    gain = Math.max(20, Math.min(32, gain));
+  } else if ((locationContext?.isEcoSensitiveOrWaterBuffer || /(wetland|marsh|lake|river|forest)/i.test(descLower)) && isIndustrialManufacturing && !hasDisplacement) {
+    gain = Math.max(18, Math.min(30, gain));
+  } else if ((hasDisplacement && (hasSeverePollution || /(cement|chemical|factory|industrial|plant)/i.test(descLower))) || (hasAgriLoss && /(destroy|destruction|conversion|demolish)/i.test(descLower))) {
     gain = Math.max(8, Math.min(14, gain)); // Very Low Gain (8-14)
   } else if (hasAgriLoss && /(industrial|factory|zone|commercial)/i.test(descLower)) {
     gain = Math.max(22, Math.min(38, gain));
+  } else if (/(dam|water release|excess water)/i.test(descLower) && /(flood|monsoon|surplus|precaution)/i.test(descLower)) {
+    gain = Math.max(75, Math.min(85, gain));
+  } else if (/(dam|water|canal)/i.test(descLower) && /(drought|dry|block|divert|scarcity)/i.test(descLower)) {
+    gain = Math.max(10, Math.min(20, gain));
+  } else if (/(widen|widening)/i.test(descLower) && /(vacant|bypass|outer ring|peripheral)/i.test(descLower)) {
+    gain = Math.max(70, Math.min(80, gain));
+  } else if (/(widen|widening)/i.test(descLower) && (/(dense|residential|bazaar|market|shop|demolish)/i.test(descLower) || locationContext?.isHighDensityResidential)) {
+    gain = Math.max(25, Math.min(35, gain));
   } else if (hasAgriLoss || hasDisplacement || hasSeverePollution) {
     if (/(purely negative|demolition|destroy|destruction)/i.test(descLower) || hintPolarity === 'negative') {
       gain = Math.max(8, Math.min(20, gain)); // Very Low Gain (0–20)
@@ -494,7 +573,7 @@ export function computeFrameworkGainAndFriction(
       gain = Math.max(15, Math.min(35, gain)); // Low Gain (15–35)
     }
   } else if (isIndustrialManufacturing && !isPublicWelfarePositive) {
-    // Generic industrial proposals: Derived from proposal-specific impacts, not unproven economic templates.
+    // Generic industrial proposals without explicit location context: 38-44
     gain = Math.max(38, Math.min(44, gain)); // Low Gain (38–44)
   } else if (isPublicWelfarePositive) {
     gain = Math.max(78, Math.min(94, gain)); // High to Very High Gain (78–94)
@@ -506,7 +585,19 @@ export function computeFrameworkGainAndFriction(
   const gainClassification = getGainClassification(gain);
 
   let gainJustification = '';
-  if (hasDisplacement && (hasSeverePollution || /(cement|chemical|factory|plant)/i.test(descLower))) {
+  if (locationContext?.isApprovedIndustrialZone && isIndustrialManufacturing && !hasDisplacement && !hasAgriLoss) {
+    gainJustification = `Net benefit is Moderate (${gain}/100): Situated within an approved industrial estate (${locationContext.municipalInfrastructureBaseline[0] || 'SIPCOT/SIDCO'}), benefiting from established industrial zoning, statutory infrastructure, and buffer distances from residential settlements.`;
+  } else if (locationContext?.isAgriculturalOrRuralZone && isIndustrialManufacturing && !hasDisplacement) {
+    gainJustification = `Net benefit is Low (${gain}/100): Industrial placement on active farmlands in ${locationContext.district} results in severe topsoil destruction and permanent loss of agrarian livelihoods that substantially depress net societal benefit.`;
+  } else if (/(dam|water release|excess water)/i.test(descLower) && /(flood|monsoon|surplus|precaution)/i.test(descLower)) {
+    gainJustification = `Net benefit is High (${gain}/100): Proactive dam flood release protocol protects downstream populations and riverine settlements from catastrophic inundation and reservoir breach.`;
+  } else if (/(dam|water|canal)/i.test(descLower) && /(drought|dry|block|divert|scarcity)/i.test(descLower)) {
+    gainJustification = `Net benefit is Very Low (${gain}/100): Blocking or diverting canal water during drought starves downstream farmlands of irrigation, triggering agrarian crisis and acute crop loss.`;
+  } else if (/(widen|widening)/i.test(descLower) && /(vacant|bypass|outer ring|peripheral)/i.test(descLower)) {
+    gainJustification = `Net benefit is High (${gain}/100): Road widening along vacant/peripheral bypass right-of-way substantially enhances regional logistics and commuter transit with minimal disruption.`;
+  } else if (/(widen|widening)/i.test(descLower) && (/(dense|residential|bazaar|market|shop|demolish)/i.test(descLower) || locationContext?.isHighDensityResidential)) {
+    gainJustification = `Net benefit is Low (${gain}/100): Widening through dense urban/residential streets results in extensive commercial frontage demolition, tenant eviction, and severe local economic disruption.`;
+  } else if (hasDisplacement && (hasSeverePollution || /(cement|chemical|factory|plant)/i.test(descLower))) {
     gainJustification = `Net benefit is Very Low (${gain}/100): Severe residential displacement and heavy industrial pollution hazards overwhelmingly eclipse potential commercial or factory output. Potential economic benefits cannot override acute human displacement and environmental harm.`;
   } else if (hasAgriLoss && /(industrial|zone)/i.test(descLower)) {
     gainJustification = `Net benefit is Low to Moderate (${gain}/100): While industrial zoning generates localized employment and commercial revenue, severe destruction of fertile agricultural topsoil, permanent loss of farmer livelihoods, and acute sustainability deficits drastically depress net societal gain.`;
@@ -586,6 +677,67 @@ export function computeFrameworkGainAndFriction(
     frictionIncreases.push(`safety concerns & public hazard management (+${boost})`);
   }
 
+  // Context-Aware Administrative Adjustments for Friction
+  if (locationContext) {
+    if (locationContext.isApprovedIndustrialZone && isIndustrialManufacturing && !hasDisplacement && !hasAgriLoss) {
+      const relief = 16;
+      friction -= relief;
+      frictionDecreases.push(`conforming industrial zoning & established estate buffer from residential areas (-${relief})`);
+    } else if (locationContext.isAgriculturalOrRuralZone && (isIndustrialManufacturing || /(factory|industrial|zone|plant)/i.test(descLower))) {
+      const boost = 24;
+      friction += boost;
+      frictionIncreases.push(`intense agrarian resistance against conversion of fertile farmlands in ${locationContext.district} (+${boost})`);
+    }
+
+    if (locationContext.isEcoSensitiveOrWaterBuffer && (isIndustrialManufacturing || hasSeverePollution || /(factory|plant|effluent|dyeing)/i.test(descLower))) {
+      const waterName = locationContext.nearbyWaterBodies[0] || 'local hydrologic catchment';
+      const boost = 22;
+      friction += boost;
+      frictionIncreases.push(`environmental opposition & strict TNCDBR 15m buffer compliance near ${waterName} (+${boost})`);
+    }
+
+    if (locationContext.isHighDensityResidential && (isIndustrialManufacturing || hasSeverePollution || /(factory|plant|dust|noise)/i.test(descLower))) {
+      const boost = 24;
+      friction += boost;
+      frictionIncreases.push(`public health grievances and citizen opposition in high-density residential ward (+${boost})`);
+    }
+
+    if (locationContext.highRiskActionsDetected.length > 0) {
+      const actions = locationContext.highRiskActionsDetected;
+      const boost = Math.min(28, actions.length * 9);
+      friction += boost;
+      frictionIncreases.push(`enhanced administrative friction from high-risk actions (${actions.join(', ')}) (+${boost})`);
+    }
+
+    // Dam / Water Release: Flood vs Drought
+    const isWaterAction = /(dam|water release|excess water|sluice|canal|reservoir|water block|divert water)/i.test(descLower);
+    if (isWaterAction) {
+      if (/(flood|monsoon|surplus|precaution|excess flow|storage safety|heavy inflow)/i.test(descLower)) {
+        const relief = 20;
+        friction -= relief;
+        frictionDecreases.push(`vital public safety flood mitigation protocol (-${relief})`);
+      } else if (/(drought|dry|scarcity|block|divert|deprive|shut canal)/i.test(descLower)) {
+        const boost = 32;
+        friction += boost;
+        frictionIncreases.push(`acute agricultural crop failure, farmer agitations, and interstate/inter-district water disputes (+${boost})`);
+      }
+    }
+
+    // Road Widening: Vacant Bypass vs Densely Populated Neighborhood
+    const isRoadAction = /(widen|widening|road expansion|corridor expansion|highway)/i.test(descLower);
+    if (isRoadAction) {
+      if (/(vacant|bypass|outer ring|peripheral|unoccupied|open land)/i.test(descLower)) {
+        const relief = 16;
+        friction -= relief;
+        frictionDecreases.push(`minimal structural demolition and low displacement along bypass corridor (-${relief})`);
+      } else if (/(dense|residential|bazaar|market|shop|demolish|evict|relocate|commercial street)/i.test(descLower) || locationContext.isHighDensityResidential) {
+        const boost = 28;
+        friction += boost;
+        frictionIncreases.push(`merchant union resistance, structural demolition litigation, and tenant resettlement costs (+${boost})`);
+      }
+    }
+  }
+
   // Facilitator triggers (-)
   if (isPublicWelfarePositive) {
     const reduction = 10;
@@ -597,15 +749,28 @@ export function computeFrameworkGainAndFriction(
   }
 
   // STRICT DECISION RULES FOR FRICTION:
-  // "The Execution Risk score must represent the actual risks, conflicts, disruption, legal complexity, environmental concerns, displacement, implementation difficulty, and uncertainty associated with the proposal."
-  if (hasDisplacement && (hasSeverePollution || /(cement|chemical|factory|industrial|plant)/i.test(descLower))) {
+  if (locationContext?.isApprovedIndustrialZone && isIndustrialManufacturing && !hasDisplacement && !hasAgriLoss) {
+    friction = Math.max(40, Math.min(48, friction));
+  } else if ((locationContext?.isAgriculturalOrRuralZone || /(farmland|agricultural|crop|fertile)/i.test(descLower)) && isIndustrialManufacturing && !hasDisplacement) {
+    friction = Math.max(76, Math.min(90, friction));
+  } else if ((locationContext?.isEcoSensitiveOrWaterBuffer || /(wetland|marsh|lake|river|forest)/i.test(descLower)) && isIndustrialManufacturing && !hasDisplacement) {
+    friction = Math.max(78, Math.min(92, friction));
+  } else if (hasDisplacement && (hasSeverePollution || /(cement|chemical|factory|industrial|plant)/i.test(descLower))) {
     friction = Math.max(90, Math.min(96, friction)); // Critical Friction (90–96)
   } else if (hasAgriLoss && /(industrial|factory|zone)/i.test(descLower)) {
     friction = Math.max(82, Math.min(95, friction));
+  } else if (/(dam|water release|excess water)/i.test(descLower) && /(flood|monsoon|surplus|precaution)/i.test(descLower)) {
+    friction = Math.max(20, Math.min(30, friction));
+  } else if (/(dam|water|canal)/i.test(descLower) && /(drought|dry|block|divert|scarcity)/i.test(descLower)) {
+    friction = Math.max(90, Math.min(98, friction));
+  } else if (/(widen|widening)/i.test(descLower) && /(vacant|bypass|outer ring|peripheral)/i.test(descLower)) {
+    friction = Math.max(24, Math.min(34, friction));
+  } else if (/(widen|widening)/i.test(descLower) && (/(dense|residential|bazaar|market|shop|demolish)/i.test(descLower) || locationContext?.isHighDensityResidential)) {
+    friction = Math.max(82, Math.min(94, friction));
   } else if (hasAgriLoss || hasDisplacement || hasSeverePollution) {
     friction = Math.max(78, Math.min(96, friction)); // High to Very High Friction (78–96)
   } else if (isIndustrialManufacturing && !isPublicWelfarePositive) {
-    // Generic industrial project: actual execution risks, water allocation, pollution controls, and legal complexity
+    // Generic industrial project without explicit location context: 56-62
     friction = Math.max(56, Math.min(62, friction)); // Moderate Friction (56–62)
   } else if (isPublicWelfarePositive) {
     friction = Math.max(14, Math.min(32, friction)); // Very Low to Low Friction (0–32)
@@ -617,7 +782,19 @@ export function computeFrameworkGainAndFriction(
   const frictionClassification = getFrictionClassification(friction);
 
   let frictionJustification = '';
-  if (hasDisplacement && (hasSeverePollution || /(cement|chemical|factory|plant)/i.test(descLower))) {
+  if (locationContext?.isApprovedIndustrialZone && isIndustrialManufacturing && !hasDisplacement && !hasAgriLoss) {
+    frictionJustification = `Implementation friction is Moderate (${friction}/100): Manageable operational requirements within an approved industrial park, requiring standard TNPCB Consent to Establish and trade effluent compliance without residential eviction or agricultural disruption.`;
+  } else if (locationContext?.isAgriculturalOrRuralZone && isIndustrialManufacturing && !hasDisplacement) {
+    frictionJustification = `Implementation friction is High to Very High (${friction}/100): Triggered by strong agrarian resistance against farmlands conversion in ${locationContext.district}, environmental opposition, and strict statutory agricultural preservation mandates.`;
+  } else if (/(dam|water release|excess water)/i.test(descLower) && /(flood|monsoon|surplus|precaution)/i.test(descLower)) {
+    frictionJustification = `Implementation friction is Low (${friction}/100): Action follows standard PWD flood regulation protocols and disaster management procedures with broad public safety alignment.`;
+  } else if (/(dam|water|canal)/i.test(descLower) && /(drought|dry|block|divert|scarcity)/i.test(descLower)) {
+    frictionJustification = `Implementation friction is Very High (${friction}/100): Severe resistance from downstream farming communities, agrarian unions, and high likelihood of interstate or inter-district legal disputes.`;
+  } else if (/(widen|widening)/i.test(descLower) && /(vacant|bypass|outer ring|peripheral)/i.test(descLower)) {
+    frictionJustification = `Implementation friction is Low to Moderate (${friction}/100): Low execution resistance due to vacant land alignment, avoiding commercial demolition and residential eviction.`;
+  } else if (/(widen|widening)/i.test(descLower) && (/(dense|residential|bazaar|market|shop|demolish)/i.test(descLower) || locationContext?.isHighDensityResidential)) {
+    frictionJustification = `Implementation friction is High to Very High (${friction}/100): Critical opposition from merchant associations, affected shopkeepers, and displaced residents facing structural demolition.`;
+  } else if (hasDisplacement && (hasSeverePollution || /(cement|chemical|factory|plant)/i.test(descLower))) {
     frictionJustification = `Implementation friction is Very High (${friction}/100): Critical resistance driven by involuntary displacement of settled families, acute public opposition, mandatory RFCTLARR Act (2013) rehabilitation liabilities, and high risk of judicial stay injunctions.`;
   } else if (hasAgriLoss && /(industrial|zone)/i.test(descLower)) {
     frictionJustification = `Implementation friction is High to Very High (${friction}/100): Triggered by strong farmer mobilization against agricultural land conversion, intense environmental opposition, complex land acquisition approvals, and high legal dispute likelihood.`;
@@ -647,7 +824,8 @@ export function computeImpactScores(
   analyses: Record<AgentImpactDomain, AgentAnalysis>,
   hintPolarity?: 'positive' | 'negative' | 'mixed',
   description: string = '',
-  archetype?: PolicyArchetype
+  archetype?: PolicyArchetype,
+  locationContext?: LocationAdministrativeContext
 ): ImpactScores {
   // Operational Friction / Disruption scores (0-100)
   const transport = analyses.transport?.score ?? 35;
@@ -669,7 +847,8 @@ export function computeImpactScores(
     analyses,
     hintPolarity,
     description,
-    archetype
+    archetype,
+    locationContext
   );
 
   const overallPolicyRisk = framework.frictionScore;
@@ -777,7 +956,8 @@ export function buildBalancedDecisionEvaluation(
   policy: PolicyUnderstanding,
   agentAnalyses: Record<AgentImpactDomain, AgentAnalysis>,
   impactScores: ImpactScores,
-  intentPolarity: 'positive' | 'negative' | 'mixed'
+  intentPolarity: 'positive' | 'negative' | 'mixed',
+  locationContext?: LocationAdministrativeContext
 ): BalancedDecisionEvaluation {
   const descLower = description.toLowerCase();
   const text = `${description} ${policy.reason || ''} ${policy.summary || ''}`.toLowerCase();
@@ -807,19 +987,25 @@ export function buildBalancedDecisionEvaluation(
   const destructionOfAgriculturalLand =
     archetype === 'agricultural_destruction_hazard' ||
     (isAgrarianDestructionWord && isAgrarianLandWord) ||
-    descLower.includes('destruction of agricultur');
+    descLower.includes('destruction of agricultur') ||
+    (Boolean(locationContext?.isAgriculturalOrRuralZone) && !locationContext?.isApprovedIndustrialZone && /(factory|industrial|manufacturing|plant|acquire|convert|demolish)/i.test(descLower));
+
+  const isVacantOrBypass = (descLower.includes('widen') || descLower.includes('widening')) && (descLower.includes('vacant') || descLower.includes('bypass') || descLower.includes('peripheral') || descLower.includes('outer ring'));
 
   const displacementOfPeople =
-    archetype === 'displacement_relocation_industrial' ||
-    archetype === 'forced_eviction_resettlement' ||
-    descLower.includes('relocate') ||
-    descLower.includes('relocation') ||
-    descLower.includes('displacement') ||
-    descLower.includes('evict') ||
-    descLower.includes('eviction') ||
-    descLower.includes('families') ||
-    descLower.includes('resettle') ||
-    descLower.includes('slum clearance');
+    !isVacantOrBypass && (
+      archetype === 'displacement_relocation_industrial' ||
+      archetype === 'forced_eviction_resettlement' ||
+      descLower.includes('relocate') ||
+      descLower.includes('relocation') ||
+      descLower.includes('displacement') ||
+      descLower.includes('evict') ||
+      descLower.includes('eviction') ||
+      descLower.includes('families') ||
+      descLower.includes('resettle') ||
+      descLower.includes('slum clearance') ||
+      ((descLower.includes('widen') || descLower.includes('widening')) && (descLower.includes('dense') || descLower.includes('residential') || descLower.includes('bazaar') || descLower.includes('shop') || Boolean(locationContext?.isHighDensityResidential)))
+    );
 
   const irreversibleEnvironmentalDamage =
     archetype === 'environmental_destruction_loss' ||
@@ -829,7 +1015,8 @@ export function buildBalancedDecisionEvaluation(
     descLower.includes('tree felling') ||
     descLower.includes('wetland destruction') ||
     descLower.includes('lake bed encroachment') ||
-    descLower.includes('forest clear');
+    descLower.includes('forest clear') ||
+    (Boolean(locationContext?.isEcoSensitiveOrWaterBuffer) && !locationContext?.isApprovedIndustrialZone && /(factory|industrial|chemical|dyeing|effluent|pollut)/i.test(descLower));
 
   const seriousPollution =
     archetype === 'polluting_industry_hazard' ||
@@ -839,7 +1026,8 @@ export function buildBalancedDecisionEvaluation(
     descLower.includes('smelter') ||
     descLower.includes('toxic effluent') ||
     descLower.includes('clinker dust') ||
-    descLower.includes('hazardous emission');
+    descLower.includes('hazardous emission') ||
+    (Boolean(locationContext?.isEcoSensitiveOrWaterBuffer || locationContext?.isHighDensityResidential) && !locationContext?.isApprovedIndustrialZone && /(factory|manufacturing|textile|industrial)/i.test(descLower));
 
   const publicSafetyRisks =
     descLower.includes('explosion') ||
@@ -854,7 +1042,8 @@ export function buildBalancedDecisionEvaluation(
     descLower.includes('zoning violation') ||
     descLower.includes('unauthorized') ||
     descLower.includes('master plan violation') ||
-    (agentAnalyses.policy_compliance?.score ?? 0) >= 75;
+    (agentAnalyses.policy_compliance?.score ?? 0) >= 75 ||
+    (!locationContext?.isApprovedIndustrialZone && Boolean(locationContext?.isAgriculturalOrRuralZone || locationContext?.isEcoSensitiveOrWaterBuffer) && /(factory|industrial|plant)/i.test(descLower));
 
   const severeImpactFlags = {
     irreversibleEnvironmentalDamage,
@@ -911,6 +1100,21 @@ export function buildBalancedDecisionEvaluation(
       ],
       evidence: 'Potential industrial production gains are recognized as potential benefits, but are heavily eclipsed by acute economic disruption to settled households.',
     };
+  } else if (locationContext?.isApprovedIndustrialZone && isIndustrialManufacturing) {
+    dimensions.economic = {
+      dimension: 'economic',
+      dimensionLabel: 'Economic Impact',
+      impactLevel: 'Moderate Positive',
+      positiveImpacts: [
+        `Leverages designated industrial infrastructure in ${locationContext.municipalInfrastructureBaseline[0] || 'SIPCOT/SIDCO industrial estate'}`,
+        'Potential manufacturing production output and factory jobs (scale unstated in proposal)',
+        'Strengthens regional industrial supply chain and export logistics',
+      ],
+      negativeImpacts: [
+        'Municipal utility load allocation and industrial power consumption',
+      ],
+      evidence: `Proposed within an approved industrial estate. Industrial production aligns with planned commercial zoning, though specific job counts and investment scale remain unstated in the proposal.`,
+    };
   } else if (isIndustrialManufacturing) {
     dimensions.economic = {
       dimension: 'economic',
@@ -940,6 +1144,18 @@ export function buildBalancedDecisionEvaluation(
       negativeImpacts: ['Requires initial state capital budget outlay'],
       evidence: 'Direct expansion of public clinical infrastructure yields high long-term economic returns and protects household wealth.',
     };
+  } else if (text.includes('dam') && (text.includes('drought') || text.includes('block') || text.includes('divert'))) {
+    dimensions.economic = {
+      dimension: 'economic',
+      dimensionLabel: 'Economic Impact',
+      impactLevel: 'High Negative',
+      positiveImpacts: [],
+      negativeImpacts: [
+        'Severe crop failure and loss of agrarian revenue across downstream ayacut',
+        'Deprivation of canal irrigation water during critical standing crop stages',
+      ],
+      evidence: 'Depriving downstream agrarian belts of canal irrigation during drought creates acute economic catastrophe for farming households.',
+    };
   } else {
     dimensions.economic = {
       dimension: 'economic',
@@ -960,10 +1176,27 @@ export function buildBalancedDecisionEvaluation(
       positiveImpacts: [],
       negativeImpacts: [
         destructionOfAgriculturalLand ? 'Permanent loss of fertile multi-crop topsoil and agrarian biodiversity' : 'Air quality degradation with particulate and industrial emissions',
-        'Loss of natural groundwater percolation basin and carbon sink capacity',
-        'Breach of statutory environmental carrying capacity standards',
+        locationContext?.isEcoSensitiveOrWaterBuffer ? `Direct contamination risk to nearby water body (${locationContext.nearbyWaterBodies[0] || 'local river basin'})` : 'Loss of natural groundwater percolation basin and carbon sink capacity',
+        'Breach of statutory environmental carrying capacity and buffer standards',
       ],
-      evidence: 'Causes irreversible topsoil destruction or industrial contamination, resulting in permanent ecological damage.',
+      evidence: locationContext?.isEcoSensitiveOrWaterBuffer
+        ? `Locating industrial operations adjacent to sensitive water bodies (${locationContext.nearbyWaterBodies[0] || 'water body'}) creates severe contamination hazards and breaches statutory buffers.`
+        : 'Causes irreversible topsoil destruction or industrial contamination, resulting in permanent ecological damage.',
+    };
+  } else if (locationContext?.isApprovedIndustrialZone && isIndustrialManufacturing) {
+    dimensions.environmental = {
+      dimension: 'environmental',
+      dimensionLabel: 'Environmental Impact',
+      impactLevel: 'Moderate Negative',
+      positiveImpacts: [
+        'Situated in designated industrial estate with Common Effluent Treatment Plant (CETP) provisions',
+        'Maintains established physical buffer distance from residential settlements',
+      ],
+      negativeImpacts: [
+        'Industrial water consumption draw on regional groundwater resources',
+        'Mandatory trade effluent discharge monitoring under TNPCB Consent to Establish',
+      ],
+      evidence: `Proposed inside an approved industrial estate (${locationContext.municipalInfrastructureBaseline[0] || 'SIPCOT/SIDCO'}). Environmental risks are manageable under statutory TNPCB Consent to Establish (CTE) conditions.`,
     };
   } else if (isIndustrialManufacturing) {
     dimensions.environmental = {
@@ -1015,6 +1248,15 @@ export function buildBalancedDecisionEvaluation(
       ],
       evidence: 'Forced population displacement or farmland conversion inflicts severe human hardship and civic conflict.',
     };
+  } else if (locationContext?.isApprovedIndustrialZone && isIndustrialManufacturing) {
+    dimensions.social = {
+      dimension: 'social',
+      dimensionLabel: 'Social Impact',
+      impactLevel: 'Neutral',
+      positiveImpacts: ['Minimal residential disturbance due to established industrial buffer'],
+      negativeImpacts: ['Requires verification of worker occupational health and safety standards'],
+      evidence: `Situated within a designated industrial zone away from dense residential settlements, avoiding immediate residential displacement or community agitation.`,
+    };
   } else if (isIndustrialManufacturing) {
     dimensions.social = {
       dimension: 'social',
@@ -1036,6 +1278,18 @@ export function buildBalancedDecisionEvaluation(
       ],
       negativeImpacts: ['Temporary localized traffic adjustments during building phase'],
       evidence: 'Delivers transformative social welfare equity and widespread citizen satisfaction.',
+    };
+  } else if ((text.includes('widen') || text.includes('widening')) && (text.includes('vacant') || text.includes('bypass'))) {
+    dimensions.social = {
+      dimension: 'social',
+      dimensionLabel: 'Social Impact',
+      impactLevel: 'Moderate Positive',
+      positiveImpacts: [
+        'Enhances regional transit without residential demolition or commercial eviction',
+        'Minimizes civic disruption through peripheral bypass corridor alignment',
+      ],
+      negativeImpacts: ['Temporary construction noise during civil works'],
+      evidence: 'Utilizing vacant/bypass corridors avoids residential displacement while enhancing regional mobility.',
     };
   } else {
     dimensions.social = {
@@ -1062,6 +1316,18 @@ export function buildBalancedDecisionEvaluation(
       ],
       evidence: 'Locating polluting heavy industry in proximity to human settlements presents severe respiratory and safety hazards.',
     };
+  } else if (locationContext?.isApprovedIndustrialZone && isIndustrialManufacturing) {
+    dimensions.publicHealthSafety = {
+      dimension: 'publicHealthSafety',
+      dimensionLabel: 'Public Health & Safety',
+      impactLevel: 'Neutral',
+      positiveImpacts: ['Dedicated freight ingress corridors minimize municipal traffic hazards'],
+      negativeImpacts: [
+        'Requires rigorous on-site factory worker safety and occupational health compliance',
+        'Hazardous chemical handling protocols must be maintained',
+      ],
+      evidence: 'Operating within an approved industrial estate separates heavy freight from local residential traffic, mitigating community health hazards.',
+    };
   } else if (isIndustrialManufacturing) {
     dimensions.publicHealthSafety = {
       dimension: 'publicHealthSafety',
@@ -1087,14 +1353,23 @@ export function buildBalancedDecisionEvaluation(
       negativeImpacts: ['Hazardous bio-medical waste requires strict protocols'],
       evidence: 'Substantially elevates regional life expectancy and emergency clinical survival.',
     };
-  } else if (text.includes('dam') || text.includes('water discharge')) {
+  } else if ((text.includes('dam') || text.includes('water discharge')) && (text.includes('flood') || text.includes('surplus') || text.includes('monsoon'))) {
     dimensions.publicHealthSafety = {
       dimension: 'publicHealthSafety',
       dimensionLabel: 'Public Health & Safety',
-      impactLevel: 'Moderate Positive',
-      positiveImpacts: ['Prevents catastrophic dam breach and reservoir overtopping'],
-      negativeImpacts: ['Downstream riparian inundation requires controlled evacuation'],
-      evidence: 'Controlled hydraulic discharge averts structural disaster while requiring downstream flood safety.',
+      impactLevel: 'High Positive',
+      positiveImpacts: ['Safeguards downstream human settlements from catastrophic flash flooding and reservoir breach'],
+      negativeImpacts: ['Downstream riparian warning and evacuation protocol required'],
+      evidence: 'Controlled hydraulic discharge during flood peaks averts catastrophic structural failure and protects thousands of downstream residents.',
+    };
+  } else if (text.includes('dam') && (text.includes('drought') || text.includes('block') || text.includes('divert'))) {
+    dimensions.publicHealthSafety = {
+      dimension: 'publicHealthSafety',
+      dimensionLabel: 'Public Health & Safety',
+      impactLevel: 'Moderate Negative',
+      positiveImpacts: [],
+      negativeImpacts: ['Severe drinking water scarcity in tail-end rural habitations'],
+      evidence: 'Canal diversion during drought deprives rural habitations of essential drinking water reserves.',
     };
   } else {
     dimensions.publicHealthSafety = {
@@ -1120,6 +1395,18 @@ export function buildBalancedDecisionEvaluation(
       ],
       evidence: 'Demolition of established agrarian irrigation infrastructure impairs regional water drainage.',
     };
+  } else if (locationContext?.isApprovedIndustrialZone && isIndustrialManufacturing) {
+    dimensions.infrastructure = {
+      dimension: 'infrastructure',
+      dimensionLabel: 'Infrastructure Impact',
+      impactLevel: 'Moderate Positive',
+      positiveImpacts: [
+        `Leverages pre-existing SIPCOT/SIDCO heavy utility power feeders and internal logistics roads`,
+        'Prevents haphazard encroachment onto municipal urban road networks',
+      ],
+      negativeImpacts: ['Increases demand load on industrial water distribution network'],
+      evidence: 'Utilizes planned industrial park infrastructure, avoiding strain on municipal residential civic utilities.',
+    };
   } else if (isIndustrialManufacturing) {
     dimensions.infrastructure = {
       dimension: 'infrastructure',
@@ -1141,7 +1428,7 @@ export function buildBalancedDecisionEvaluation(
       negativeImpacts: ['Increases demand load on municipal water and sewer links'],
       evidence: 'Delivers high-capacity, permanent civic infrastructure to the district.',
     };
-  } else if (text.includes('dam') || text.includes('water discharge')) {
+  } else if ((text.includes('dam') || text.includes('water discharge')) && (text.includes('flood') || text.includes('surplus') || text.includes('monsoon'))) {
     dimensions.infrastructure = {
       dimension: 'infrastructure',
       dimensionLabel: 'Infrastructure Impact',
@@ -1149,6 +1436,18 @@ export function buildBalancedDecisionEvaluation(
       positiveImpacts: ['Protects dam structural integrity, spillway gates, and irrigation headworks'],
       negativeImpacts: ['Erosion risk along unlined downstream canal bunds'],
       evidence: 'Crucial for safeguarding regional water resources hydraulic infrastructure.',
+    };
+  } else if ((text.includes('widen') || text.includes('widening')) && (text.includes('vacant') || text.includes('bypass'))) {
+    dimensions.infrastructure = {
+      dimension: 'infrastructure',
+      dimensionLabel: 'Infrastructure Impact',
+      impactLevel: 'High Positive',
+      positiveImpacts: [
+        'Substantially expands arterial highway capacity and eliminates freight bottlenecks',
+        'Dedicated multi-lane right-of-way built to IRC express corridor standards',
+      ],
+      negativeImpacts: ['Requires initial civil capital expenditure outlay'],
+      evidence: 'Delivers major long-term transportation infrastructure without demolishing municipal urban fabric.',
     };
   } else {
     dimensions.infrastructure = {
@@ -1175,6 +1474,15 @@ export function buildBalancedDecisionEvaluation(
       ],
       evidence: 'Massive citizen resistance and grievance load overwhelms local administrative bandwidth.',
     };
+  } else if (locationContext?.isApprovedIndustrialZone && isIndustrialManufacturing) {
+    dimensions.municipalAdmin = {
+      dimension: 'municipalAdmin',
+      dimensionLabel: 'Municipal Administration Impact',
+      impactLevel: 'Neutral',
+      positiveImpacts: ['Standardized estate management handled via SIPCOT/SIDCO administrative wing'],
+      negativeImpacts: ['Routine factory inspectorate and environmental oversight duties'],
+      evidence: 'Estate operations follow established municipal administration protocols without community grievance escalation.',
+    };
   } else if (isIndustrialManufacturing) {
     dimensions.municipalAdmin = {
       dimension: 'municipalAdmin',
@@ -1199,14 +1507,14 @@ export function buildBalancedDecisionEvaluation(
       negativeImpacts: ['Requires multi-departmental coordination during civil execution'],
       evidence: 'Enhances municipal administrative service delivery capabilities.',
     };
-  } else if (text.includes('dam') || text.includes('water discharge')) {
+  } else if ((text.includes('dam') || text.includes('water discharge')) && (text.includes('flood') || text.includes('surplus') || text.includes('monsoon'))) {
     dimensions.municipalAdmin = {
       dimension: 'municipalAdmin',
       dimensionLabel: 'Municipal Administration Impact',
-      impactLevel: 'Moderate Negative',
-      positiveImpacts: ['Effective inter-agency flood control protocol execution'],
-      negativeImpacts: ['Demanding emergency shelter management and relief logistics'],
-      evidence: 'Puts temporary emergency coordination strain on municipal and revenue machinery.',
+      impactLevel: 'Moderate Positive',
+      positiveImpacts: ['Effective execution of inter-departmental disaster management protocol'],
+      negativeImpacts: ['Emergency coordination and downstream evacuation logistics required'],
+      evidence: 'Follows established state disaster management protocol with clear administrative command structure.',
     };
   } else {
     dimensions.municipalAdmin = {
@@ -1256,6 +1564,20 @@ export function buildBalancedDecisionEvaluation(
         'National Green Tribunal (NGT) enforcement notice and stay liability',
       ],
       evidence: 'Violates environmental buffer guidelines mandated for heavy polluting industries.',
+    };
+  } else if (locationContext?.isApprovedIndustrialZone && isIndustrialManufacturing) {
+    dimensions.legalCompliance = {
+      dimension: 'legalCompliance',
+      dimensionLabel: 'Legal & Policy Compliance',
+      impactLevel: 'Moderate Positive',
+      positiveImpacts: [
+        'Conforms to designated industrial land-use zoning in Local Planning Authority Master Plan',
+        'Eligible for single-window statutory clearances via Guidance Tamil Nadu',
+      ],
+      negativeImpacts: [
+        'Mandatory Consent to Establish (CTE) under Water and Air Acts from TNPCB',
+      ],
+      evidence: `Conforms to designated Master Plan industrial zoning in ${locationContext.district}. Standard statutory environmental compliance (CTE/CTO) required prior to operation.`,
     };
   } else if (isIndustrialManufacturing) {
     dimensions.legalCompliance = {
@@ -1317,6 +1639,17 @@ export function buildBalancedDecisionEvaluation(
       ],
       evidence: 'Involuntary eviction creates long-term social vulnerabilities and chronic poverty.',
     };
+  } else if (locationContext?.isApprovedIndustrialZone && isIndustrialManufacturing) {
+    dimensions.longTermSustainability = {
+      dimension: 'longTermSustainability',
+      dimensionLabel: 'Long-Term Sustainability',
+      impactLevel: 'Neutral',
+      positiveImpacts: ['Planned industrial clustering limits haphazard suburban sprawl'],
+      negativeImpacts: [
+        `Long-term groundwater sustainability requires water recycling and rainwater harvesting in ${locationContext.district}`,
+      ],
+      evidence: 'Industrial estate clustering provides structured development, subject to sustainable water consumption audits.',
+    };
   } else if (isIndustrialManufacturing) {
     dimensions.longTermSustainability = {
       dimension: 'longTermSustainability',
@@ -1376,6 +1709,19 @@ export function buildBalancedDecisionEvaluation(
   if (destructionOfAgriculturalLand || displacementOfPeople || (seriousPollution && !archetype.includes('hospital'))) {
     // Severe reduction overrides: Irreversible environmental damage, destruction of agricultural land, displacement of people
     overallClassification = 'Negative';
+  } else if ((descLower.includes('dam') || descLower.includes('water')) && (descLower.includes('drought') || descLower.includes('dry') || descLower.includes('block') || descLower.includes('divert'))) {
+    overallClassification = 'Negative';
+  } else if ((descLower.includes('widen') || descLower.includes('widening')) && (descLower.includes('dense') || descLower.includes('residential') || descLower.includes('bazaar') || Boolean(locationContext?.isHighDensityResidential))) {
+    overallClassification = 'Negative';
+  } else if ((descLower.includes('dam') || descLower.includes('water')) && (descLower.includes('flood') || descLower.includes('surplus') || descLower.includes('monsoon'))) {
+    overallClassification = 'Positive';
+  } else if ((descLower.includes('widen') || descLower.includes('widening')) && (descLower.includes('vacant') || descLower.includes('bypass'))) {
+    overallClassification = 'Positive';
+  } else if (locationContext?.isApprovedIndustrialZone && isIndustrialManufacturing && !hasDisplacement && !hasAgriLoss) {
+    // Approved Industrial Estate (e.g. SIPCOT/SIDCO): balanced commercial gain with manageable compliance friction
+    overallClassification = 'Mixed';
+  } else if ((locationContext?.isAgriculturalOrRuralZone || locationContext?.isEcoSensitiveOrWaterBuffer) && isIndustrialManufacturing) {
+    overallClassification = 'Negative';
   } else if (hasAnySevereFlag && avgScore < 0.2) {
     overallClassification = 'Negative';
   } else if (isIndustrialManufacturing && !isPublicWelfarePositive) {
@@ -1411,18 +1757,27 @@ export function buildBalancedDecisionEvaluation(
 
   let classificationRationale = '';
   if (overallClassification === 'Negative') {
-    classificationRationale = `The proposal is classified as Negative under mandatory balanced evaluation rules. While isolated gains were identified in ${posDims.length ? posDims.join(', ') : 'speculative commercial expansion'}, they are overwhelmingly eclipsed by severe adverse impacts in ${negDims.join(', ')}. Critically, the proposal triggers severe override flags: ${triggeredFlags.join(', ')}. Under strict neutrality standards, economic growth or industrial revenue does not override severe human displacement, agricultural land destruction, public health hazards, or ecological degradation.`;
+    classificationRationale = `The proposal is classified as Negative under administrative evaluation rules. While isolated gains were identified in ${posDims.length ? posDims.join(', ') : 'speculative commercial expansion'}, they are overwhelmingly eclipsed by severe adverse impacts in ${negDims.join(', ')}. Critically, the proposal triggers severe override flags: ${triggeredFlags.join(', ')}. Under strict municipal administration standards, commercial growth does not override severe human displacement, agricultural land destruction, public health hazards, or ecological degradation.`;
   } else if (overallClassification === 'Mixed') {
-    if (isIndustrialManufacturing && !hasDisplacement && !hasAgriLoss) {
+    if (locationContext?.isApprovedIndustrialZone && isIndustrialManufacturing) {
+      classificationRationale = `The proposal is classified as Mixed under administrative evaluation rules. Sited within an approved industrial estate (${locationContext.municipalInfrastructureBaseline[0] || 'SIPCOT/SIDCO'}), the project benefits from designated industrial zoning and buffer distances. Potential manufacturing output coexists with mandatory environmental clearance duties (TNPCB Consent to Establish under Water and Air Acts) and utility coordination.`;
+    } else if (isIndustrialManufacturing && !hasDisplacement && !hasAgriLoss) {
       classificationRationale = `The proposal is classified as Mixed under mandatory balanced evaluation rules. Potential commercial benefits (employment generation and trade activity) coexist with substantial potential risks in ${negDims.join(', ')}. Under equal-weighted multi-dimensional assessment (12.5% per dimension), unevidenced benefits cannot be treated as confirmed public welfare facts. Mandatory statutory environmental clearance (TNPCB CTE under Water and Air Acts), water allocation audits, and community safeguards are required before administrative sanction.`;
     } else {
       classificationRationale = `The proposal is classified as Mixed because significant positive impacts in ${posDims.join(', ')} directly coexist with substantial adverse drawbacks in ${negDims.join(', ')}. Under equal-weighted multi-dimensional assessment (12.5% per dimension), neither benefits nor drawbacks clearly dominate across all evaluated dimensions. Phased mitigation safeguards and structural alternatives are required before administrative sanction.`;
     }
   } else {
-    classificationRationale = `The proposal is classified as Positive because verifiable public benefits across ${posDims.join(', ')} clearly outweigh minor, manageable implementation frictions. No severe negative flags (such as irreversible ecological damage, agricultural land destruction, or human displacement) are triggered, and all 8 dimensions demonstrate net favorable balance.`;
+    classificationRationale = `The proposal is classified as Positive because verifiable public benefits across ${posDims.join(', ')} clearly outweigh minor, manageable implementation frictions. No severe negative flags (such as irreversible ecological damage, agricultural land destruction, or human displacement) are triggered, and all evaluated dimensions demonstrate net favorable balance.`;
   }
 
   const uncertaintiesAndDataGaps: string[] = [];
+  if (locationContext) {
+    uncertaintiesAndDataGaps.push(`Location Zoning Context: ${locationContext.zoningClassification}. Environmental sensitivity verification required.`);
+    if (locationContext.highRiskActionsDetected.length > 0) {
+      uncertaintiesAndDataGaps.push(`High-Risk Administrative Actions Identified: ${locationContext.highRiskActionsDetected.join(', ')}. Statutory clearances and impact studies mandatory.`);
+    }
+  }
+
   if (isIndustrialManufacturing && !hasAgriLoss && !hasDisplacement) {
     uncertaintiesAndDataGaps.push('Number of jobs: Unknown (unstated in proposal)');
     uncertaintiesAndDataGaps.push('Public approval and citizen consensus: Unknown (no survey records submitted)');
@@ -1477,6 +1832,9 @@ export function generateGenericFallbackResult(input: ScenarioInput): SimulationR
   const loc = input.location || [input.village, input.town || input.city, input.district, 'Tamil Nadu'].filter(Boolean).join(', ') || 'Tamil Nadu, India';
   const targetAsset = input.selectedAsset || determineTargetAsset(description, archetype);
 
+  // Real-World Geographic & Environmental Context Analysis
+  const locationProfile = resolveLocationAdministrativeProfile(input);
+
   // 1. Policy Understanding with all 12 dimensions
   const policy: PolicyUnderstanding = {
     decisionType: determineDecisionType(description, archetype, category),
@@ -1515,7 +1873,7 @@ export function generateGenericFallbackResult(input: ScenarioInput): SimulationR
 
   // 2. Generate Domain Analyses tailored to archetype with dual positive and negative findings
   const agentAnalyses = buildArchetypeAnalyses(archetype, description, policy, loc);
-  const impactScores = computeImpactScores(agentAnalyses, intent.polarity, description, archetype);
+  const impactScores = computeImpactScores(agentAnalyses, intent.polarity, description, archetype, locationProfile);
 
   // 3. Cascading Graph with both Positive Catalytic Nodes and Managed Risk Nodes
   const cascadingGraph = buildArchetypeCascadingGraph(archetype, description, policy, loc);
@@ -1577,7 +1935,8 @@ export function generateGenericFallbackResult(input: ScenarioInput): SimulationR
     policy,
     agentAnalyses,
     impactScores,
-    intent.polarity
+    intent.polarity,
+    locationProfile
   );
 
   let finalDerivedPolarity: 'positive' | 'negative' | 'mixed' = 'mixed';
@@ -1645,6 +2004,7 @@ export function generateGenericFallbackResult(input: ScenarioInput): SimulationR
     frictionJustification: impactScores.frictionJustification,
     netViability,
     balancedEvaluation,
+    locationContextAnalysis: locationProfile,
     disclaimer: MANDATORY_DISCLAIMER,
     populationContext: (() => {
       const popMatch = description.match(/(\d+[\d,]*)\s*(families|residents|people|households|citizens|villagers)/i);

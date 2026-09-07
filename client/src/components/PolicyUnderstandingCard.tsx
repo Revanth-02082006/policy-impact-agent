@@ -14,17 +14,23 @@ import {
   CheckCircle2,
   Tag,
   Briefcase,
+  Compass,
+  Droplets,
+  Trees,
+  AlertOctagon,
 } from 'lucide-react';
 import { DataTransparencyBadge } from './DataTransparencyBadge.js';
 
 interface PolicyUnderstandingCardProps {
   policy: PolicyUnderstanding;
   populationContext?: SimulationResult['populationContext'];
+  locationContextAnalysis?: SimulationResult['locationContextAnalysis'];
 }
 
 export const PolicyUnderstandingCard: React.FC<PolicyUnderstandingCardProps> = ({
   policy,
   populationContext,
+  locationContextAnalysis,
 }) => {
   const getUrgencyBadge = (urgency: string) => {
     switch (urgency?.toLowerCase()) {
@@ -92,6 +98,107 @@ export const PolicyUnderstandingCard: React.FC<PolicyUnderstandingCardProps> = (
           "{policy.summary}"
         </p>
       </div>
+
+      {/* Real-World Geographic & Environmental Context Analysis */}
+      {locationContextAnalysis && (
+        <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-4 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-2.5">
+            <div className="flex items-center space-x-2">
+              <div className="p-1.5 bg-emerald-100 text-emerald-800 rounded-lg">
+                <Compass className="h-4 w-4" />
+              </div>
+              <div>
+                <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
+                  Real-World Geographic & Environmental Context Analysis
+                </h4>
+                <p className="text-[11px] text-slate-500">
+                  Ground-truth location sensitivities evaluated for {locationContextAnalysis.resolvedArea}, {locationContextAnalysis.district} District
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className={`text-[11px] font-extrabold px-2.5 py-1 rounded-md border ${
+                locationContextAnalysis.isApprovedIndustrialZone
+                  ? 'bg-purple-50 text-purple-900 border-purple-200'
+                  : locationContextAnalysis.isAgriculturalOrRuralZone
+                  ? 'bg-amber-50 text-amber-900 border-amber-200'
+                  : locationContextAnalysis.isEcoSensitiveOrWaterBuffer
+                  ? 'bg-blue-50 text-blue-900 border-blue-200'
+                  : 'bg-slate-100 text-slate-800 border-slate-200'
+              }`}>
+                Zoning: {locationContextAnalysis.zoningClassification}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+            {/* Water Bodies & Ecology */}
+            <div className="p-3 bg-white rounded-lg border border-slate-200/80">
+              <div className="flex items-center space-x-1.5 text-blue-700 font-bold mb-1.5">
+                <Droplets className="h-3.5 w-3.5" />
+                <span>Water Bodies & Eco-Zones</span>
+              </div>
+              <ul className="space-y-1 text-[11px] text-slate-600 list-disc pl-3.5">
+                {locationContextAnalysis.nearbyWaterBodies.map((wb, idx) => (
+                  <li key={idx}>{wb}</li>
+                ))}
+                {locationContextAnalysis.ecologicalFeatures.map((ef, idx) => (
+                  <li key={`ef-${idx}`}>{ef}</li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Livelihoods & Industry */}
+            <div className="p-3 bg-white rounded-lg border border-slate-200/80">
+              <div className="flex items-center space-x-1.5 text-amber-700 font-bold mb-1.5">
+                <Briefcase className="h-3.5 w-3.5" />
+                <span>Local Livelihoods & Industry</span>
+              </div>
+              <ul className="space-y-1 text-[11px] text-slate-600 list-disc pl-3.5">
+                {locationContextAnalysis.primaryLivelihoods.map((lh, idx) => (
+                  <li key={idx}>{lh}</li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Hazards & Environmental Regimes */}
+            <div className="p-3 bg-white rounded-lg border border-slate-200/80">
+              <div className="flex items-center space-x-1.5 text-rose-700 font-bold mb-1.5">
+                <Shield className="h-3.5 w-3.5" />
+                <span>Vulnerabilities & Statutes</span>
+              </div>
+              <ul className="space-y-1 text-[11px] text-slate-600 list-disc pl-3.5">
+                {locationContextAnalysis.disasterVulnerabilities.map((dv, idx) => (
+                  <li key={idx}>{dv}</li>
+                ))}
+                {locationContextAnalysis.applicableStatutoryFrameworks.slice(0, 1).map((sf, idx) => (
+                  <li key={`sf-${idx}`} className="text-slate-700 font-semibold">{sf}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* High-Risk Action Warning Banner if triggered */}
+          {locationContextAnalysis.highRiskActionsDetected.length > 0 && (
+            <div className="bg-rose-50 border border-rose-200 p-2.5 rounded-lg flex items-start space-x-2 text-rose-900 text-xs">
+              <AlertOctagon className="h-4 w-4 text-rose-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <span className="font-extrabold">High-Risk Administrative Actions Flagged: </span>
+                <span className="font-bold">{locationContextAnalysis.highRiskActionsDetected.join(', ')}. </span>
+                <span className="text-[11px] text-rose-800">
+                  Enhanced risk assessment applied under Municipal Administration Decision Framework. Mandatory RFCTLARR (2013) and statutory EIA/CTE compliance required.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Contextual Analysis Summary */}
+          <div className="bg-white/80 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700">
+            <span className="font-bold text-slate-900">Municipal Administrative Context Assessment: </span>
+            <span className="text-[11px] text-slate-600">{locationContextAnalysis.contextualAnalysisSummary}</span>
+          </div>
+        </div>
+      )}
 
       {/* 8 Primary Structured Dimension Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 text-xs">

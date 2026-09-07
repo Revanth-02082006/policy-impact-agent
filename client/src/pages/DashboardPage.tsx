@@ -321,6 +321,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ currentSimulation 
           <PolicyUnderstandingCard
             policy={currentSimulation.policy}
             populationContext={currentSimulation.populationContext}
+            locationContextAnalysis={currentSimulation.locationContextAnalysis}
           />
 
           {/* Interactive Tamil Nadu Map */}

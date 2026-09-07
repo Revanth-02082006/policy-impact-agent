@@ -303,6 +303,28 @@ export interface SimulationResult {
     state: string;
     affectedDemographicSummary: string;
   };
+  locationContextAnalysis?: {
+    district: string;
+    resolvedArea: string;
+    zoningClassification: string;
+    isApprovedIndustrialZone: boolean;
+    isAgriculturalOrRuralZone: boolean;
+    isEcoSensitiveOrWaterBuffer: boolean;
+    isHighDensityResidential: boolean;
+    nearbyWaterBodies: string[];
+    ecologicalFeatures: string[];
+    primaryLivelihoods: string[];
+    disasterVulnerabilities: string[];
+    municipalInfrastructureBaseline: string[];
+    applicableStatutoryFrameworks: string[];
+    highRiskActionsDetected: string[];
+    contextualAnalysisSummary: string;
+    contextualRiskAdjustment: {
+      gainAdjustment: number;
+      frictionAdjustment: number;
+      reasoning: string;
+    };
+  };
 }
 
 export type BalancedImpactLevel =

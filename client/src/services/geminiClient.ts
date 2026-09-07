@@ -11,6 +11,7 @@ import {
   detectPolicyIntentAndArchetype,
   computeFrameworkGainAndFriction,
 } from './simulationEngine.js';
+import { resolveLocationAdministrativeProfile } from '../data/locationContextData.js';
 
 const STORAGE_KEY = 'PIA_GEMINI_API_KEY';
 const DEFAULT_KEY = ((import.meta as any).env?.VITE_GEMINI_API_KEY as string) || '';
@@ -35,7 +36,32 @@ export async function tryClientGeminiSimulation(input: ScenarioInput): Promise<S
   const apiKey = getStoredGeminiKey();
   if (!apiKey || apiKey.length < 10) return null;
 
-  const prompt = `You are a neutral Administrative Decision Impact Agent evaluating proposed administrative decisions in Tamil Nadu, India. You are strictly NOT a policy promoter or advocate.
+  const locProfile = resolveLocationAdministrativeProfile(input);
+  const locTitle = input.location || [input.village, input.town || input.city, input.district, 'Tamil Nadu'].filter(Boolean).join(', ');
+
+  const prompt = `You are an experienced Municipal Administration Decision Analyst whose responsibility is to protect public welfare, environmental sustainability, legal compliance, and efficient municipal governance. You must never act like a project promoter, investment advisor, marketing assistant, or policy supporter. Every proposal must be critically evaluated with neutrality, caution, and evidence-based administrative reasoning.
+
+FOUR INTERDEPENDENT EVALUATION INPUTS:
+1. THE PROPOSAL: Literal meaning only. Zero assumed benefits.
+2. THE SELECTED LOCATION: "${locTitle}" (District: ${locProfile.district}, Area: ${locProfile.resolvedArea})
+3. REAL-WORLD CONTEXTUAL INFORMATION:
+   - Zoning: ${locProfile.zoningClassification}
+   - Approved Industrial Estate: ${locProfile.isApprovedIndustrialZone ? 'YES (SIPCOT/SIDCO zoned with CETP and buffer)' : 'NO'}
+   - Agricultural / Farmland Belt: ${locProfile.isAgriculturalOrRuralZone ? 'YES (Active crop cultivation / agrarian tract)' : 'NO'}
+   - Water Body / Eco-Buffer: ${locProfile.isEcoSensitiveOrWaterBuffer ? 'YES (Sensitive water body / catchment buffer)' : 'NO'}
+   - High-Density Residential: ${locProfile.isHighDensityResidential ? 'YES (Dense residential wards / settlements)' : 'NO'}
+   - Nearby Water Bodies: ${locProfile.nearbyWaterBodies.join(', ') || 'Regional drainage network'}
+   - Primary Livelihoods: ${locProfile.primaryLivelihoods.join(', ') || 'Agrarian and trade employment'}
+   - Vulnerabilities: ${locProfile.disasterVulnerabilities.join('; ')}
+   - Statutory Regimes: ${locProfile.applicableStatutoryFrameworks.join('; ')}
+   - High-Risk Actions Detected: ${locProfile.highRiskActionsDetected.join(', ') || 'None'}
+   - Context Summary: ${locProfile.contextualAnalysisSummary}
+4. MUNICIPAL ADMINISTRATIVE REASONING:
+   - Same proposal MUST yield different results in different locations:
+     * Factory inside approved industrial estate (SIPCOT/SIDCO): Moderate Benefit (Gain 48–54), Manageable Risk (Friction 40–48).
+     * Same factory in farmland/river basin/residential: Significantly higher environmental & social risk (Gain 18–30, Friction 78–92).
+     * Dam flood water release: Gain 75–85, Friction 20–30. Dam drought water diversion: Gain 10–20, Friction 90–98.
+     * Road widening on vacant bypass: Gain 70–80, Friction 24–34. Road widening in dense residential/bazaar street: Gain 25–35, Friction 82–94.
 
 PRIMARY SOURCE OF TRUTH MANDATE (STRICT RULES):
 The user's proposal must be treated as the PRIMARY SOURCE OF TRUTH.
@@ -51,15 +77,10 @@ The user's proposal must be treated as the PRIMARY SOURCE OF TRUTH.
 7. If a domain has no meaningful connection to the proposal (for example, a textile factory proposal has no direct connection to Education, Disaster Resilience, Healthcare, or Public Safety), return:
    "Minimal/No Direct Impact"
    instead of inventing a benefit. Set positiveScore to 0 and state that the domain has no direct connection to the proposal.
-8. MOST IMPORTANT SCORING CHANGE:
-   - The Societal Benefit score must NOT represent the potential economic value of the project alone. It must represent the overall societal impact of the ACTUAL PROPOSAL.
-   - For an industrial project without explicit societal/environmental commitments (e.g. "Construct a textile factory near Tiruppur"), Societal Benefit must be Low to Moderate (35-48/100, labeled as Potential), and Execution Risk must be Moderate (52-65/100) reflecting effluent, water consumption, and zoning clearances.
-   - Do NOT allow a generic industrial-project template to produce high scores automatically.
-   - For proposals with explicit major negative impacts (e.g. "Relocate 500 families for cement factory"), Societal Benefit MUST be <= 25 and Execution Risk MUST be >= 75-96. Potential economic benefits must NOT override explicit negative impacts.
 
 Simulate the cross-departmental consequences of this proposed government decision:
 DECISION: "${input.description}"
-LOCATION: "${input.location || [input.village, input.town || input.city, input.district, 'Tamil Nadu'].filter(Boolean).join(', ')}"
+LOCATION: "${locTitle}"
 DEPARTMENT: "${input.department || 'General Administration'}"
 DURATION: "${input.duration || 'Standard Implementation'}"
 REASON: "${input.reason || 'Administrative Decision'}"
