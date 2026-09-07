@@ -11,6 +11,7 @@ import {
   detectPolicyIntentAndArchetype,
   computeFrameworkGainAndFriction,
 } from './simulationEngine.js';
+import { extractStructuredProposalUnderstanding } from './proposalUnderstanding.js';
 import { resolveLocationAdministrativeProfile } from '../data/locationContextData.js';
 
 const STORAGE_KEY = 'PIA_GEMINI_API_KEY';
@@ -38,6 +39,7 @@ export async function tryClientGeminiSimulation(input: ScenarioInput): Promise<S
 
   const locProfile = resolveLocationAdministrativeProfile(input);
   const locTitle = input.location || [input.village, input.town || input.city, input.district, 'Tamil Nadu'].filter(Boolean).join(', ');
+  const structuredUnderstanding = extractStructuredProposalUnderstanding(input);
 
   const prompt = `You are an experienced Municipal Administration Decision Analyst whose responsibility is to protect public welfare, environmental sustainability, legal compliance, and efficient municipal governance. You must never act like a project promoter, investment advisor, marketing assistant, or policy supporter. Every proposal must be critically evaluated with neutrality, caution, and evidence-based administrative reasoning.
 
@@ -63,6 +65,27 @@ FOUR INTERDEPENDENT EVALUATION INPUTS:
      * Dam flood water release: Gain 75–85, Friction 20–30. Dam drought water diversion: Gain 10–20, Friction 90–98.
      * Road widening on vacant bypass: Gain 70–80, Friction 24–34. Road widening in dense residential/bazaar street: Gain 25–35, Friction 82–94.
 
+PROPOSAL UNDERSTANDING & CLASSIFICATION (GROUND TRUTH PRE-ANALYSIS):
+- Objective: ${structuredUnderstanding.proposalObjective}
+- Primary Action: ${structuredUnderstanding.primaryAction}
+- Asset / Project: ${structuredUnderstanding.asset}
+- Sector: ${structuredUnderstanding.sector}
+- Primary Administrative Domain: "${structuredUnderstanding.primaryDomain}"
+- Secondary Affected Domains: ${structuredUnderstanding.secondaryDomains.join(', ') || 'None'}
+- Responsible Department: "${structuredUnderstanding.responsibleDepartment}"
+- Lead Administrative Authority: "${structuredUnderstanding.leadAdministrativeAuthority}"
+- Administrative Level: ${structuredUnderstanding.administrativeLevel}
+- Operational Scale: ${structuredUnderstanding.scale}
+- Stated Budget: "${structuredUnderstanding.budget}"
+- Stated Affected Population: "${structuredUnderstanding.affectedPopulation}"
+- Stated Land Type: "${structuredUnderstanding.landType}"
+- Explicit Stakeholders: ${structuredUnderstanding.explicitStakeholders.join(', ') || 'None explicitly stated'}
+- Inferred Stakeholders: ${structuredUnderstanding.inferredStakeholders.join(', ')}
+- Critical Unknowns / Data Gaps: ${structuredUnderstanding.unknowns.join('; ')}
+
+MANDATORY CLASSIFICATION MANDATE:
+Do NOT reclassify the proposal into unrelated domains based on isolated words (for example, NEVER classify a Legislative Assembly as Education just because the word "campus" appears). The Primary Administrative Domain is "${structuredUnderstanding.primaryDomain}".
+
 PRIMARY SOURCE OF TRUTH MANDATE (STRICT RULES):
 The user's proposal must be treated as the PRIMARY SOURCE OF TRUTH.
 1. DO NOT invent facts about the proposal.
@@ -81,9 +104,9 @@ The user's proposal must be treated as the PRIMARY SOURCE OF TRUTH.
 Simulate the cross-departmental consequences of this proposed government decision:
 DECISION: "${input.description}"
 LOCATION: "${locTitle}"
-DEPARTMENT: "${input.department || 'General Administration'}"
-DURATION: "${input.duration || 'Standard Implementation'}"
-REASON: "${input.reason || 'Administrative Decision'}"
+DEPARTMENT: "${structuredUnderstanding.responsibleDepartment}"
+DURATION: "${input.duration || structuredUnderstanding.unknowns.find(u => u.includes('duration')) || 'Standard Implementation'}"
+REASON: "${input.reason || structuredUnderstanding.proposalObjective}"
 
 CRITICAL POLICY POLARITY & BALANCED EVALUATION MANDATE:
 1. MANDATORY BALANCED DECISION EVALUATION RULES:
@@ -327,7 +350,10 @@ Return strict JSON only (no markdown):
         policy: {
           ...fallback.policy,
           ...(parsed.policy || {}),
+          proposalUnderstanding: structuredUnderstanding,
+          category: (structuredUnderstanding.primaryDomain as any) || fallback.policy.category,
         },
+        proposalUnderstanding: structuredUnderstanding,
         agentAnalyses,
         balancedEvaluation: fallback.balancedEvaluation,
       };

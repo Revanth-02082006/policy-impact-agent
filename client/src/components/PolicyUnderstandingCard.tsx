@@ -25,13 +25,16 @@ interface PolicyUnderstandingCardProps {
   policy: PolicyUnderstanding;
   populationContext?: SimulationResult['populationContext'];
   locationContextAnalysis?: SimulationResult['locationContextAnalysis'];
+  proposalUnderstanding?: SimulationResult['proposalUnderstanding'];
 }
 
 export const PolicyUnderstandingCard: React.FC<PolicyUnderstandingCardProps> = ({
   policy,
   populationContext,
   locationContextAnalysis,
+  proposalUnderstanding,
 }) => {
+  const pu = proposalUnderstanding || policy.proposalUnderstanding;
   const getUrgencyBadge = (urgency: string) => {
     switch (urgency?.toLowerCase()) {
       case 'emergency':
@@ -72,22 +75,41 @@ export const PolicyUnderstandingCard: React.FC<PolicyUnderstandingCardProps> = (
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Category Classification Badge */}
-          <span className="text-xs bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-3 py-1 rounded-lg font-bold shadow-2xs flex items-center space-x-1.5">
-            <Tag className="h-3.5 w-3.5" />
-            <span>Category: {policy.category || 'General Administration'}</span>
-          </span>
-
-          {policy.confidenceScore && (
-            <span className="text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-lg font-bold">
-              Confidence: {policy.confidenceScore}%
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Category Classification Badge */}
+            <span className="text-xs bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-3 py-1 rounded-lg font-bold shadow-2xs flex items-center space-x-1.5">
+              <Tag className="h-3.5 w-3.5" />
+              <span>Category: {policy.category || pu?.primaryDomain || 'General Administration'}</span>
             </span>
-          )}
 
-          {policy.dataSource && <DataTransparencyBadge provenance={policy.dataSource} />}
+            {policy.confidenceScore && (
+              <span className="text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-lg font-bold">
+                Confidence: {policy.confidenceScore}%
+              </span>
+            )}
+
+            {policy.dataSource && <DataTransparencyBadge provenance={policy.dataSource} />}
+          </div>
         </div>
       </div>
+
+      {/* Secondary Domains if available */}
+      {pu?.secondaryDomains && pu.secondaryDomains.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 bg-slate-50/80 p-2.5 rounded-xl border border-slate-200 text-xs">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center space-x-1">
+            <Layers className="h-3 w-3 text-indigo-600" />
+            <span>Secondary Affected Domains:</span>
+          </span>
+          <div className="flex flex-wrap gap-1">
+            {pu.secondaryDomains.map((sec, idx) => (
+              <span key={idx} className="bg-white text-slate-700 border border-slate-200 px-2 py-0.5 rounded-md font-medium text-[11px] shadow-2xs">
+                {sec}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Summary Box */}
       <div className="bg-blue-50/50 border border-blue-200/80 p-4 rounded-xl">
@@ -224,6 +246,11 @@ export const PolicyUnderstandingCard: React.FC<PolicyUnderstandingCardProps> = (
               <span>Responsible Department</span>
             </div>
             <p className="text-sm font-black text-slate-900 leading-snug">{policy.department}</p>
+            {pu?.leadAdministrativeAuthority && pu.leadAdministrativeAuthority !== policy.department && (
+              <p className="text-[11px] text-indigo-900 font-bold mt-1">
+                Auth: {pu.leadAdministrativeAuthority}
+              </p>
+            )}
           </div>
           <span className="mt-2 text-[10px] text-slate-500 font-medium block">
             Lead Administrative Authority
@@ -240,12 +267,17 @@ export const PolicyUnderstandingCard: React.FC<PolicyUnderstandingCardProps> = (
             <p className="text-sm font-black text-slate-900 leading-snug">{policy.location}</p>
             <p className="text-[11px] text-slate-600 mt-0.5">{policy.affectedArea}</p>
           </div>
-          <div className="mt-2 flex items-center justify-between">
+          <div className="mt-2 flex flex-wrap items-center gap-1.5 justify-between">
             <span className={`text-[10px] px-2 py-0.5 rounded border ${getScaleBadge(policy.scale)}`}>
               Scale: {policy.scale}
             </span>
+            {pu?.administrativeLevel && (
+              <span className="text-[10px] px-2 py-0.5 rounded border bg-blue-50 text-blue-800 border-blue-200 font-bold">
+                Level: {pu.administrativeLevel}
+              </span>
+            )}
             <span className={`text-[10px] px-2 py-0.5 rounded border ${getUrgencyBadge(policy.urgency)}`}>
-              {policy.urgency} Urgency
+              {policy.urgency}
             </span>
           </div>
         </div>
@@ -264,6 +296,28 @@ export const PolicyUnderstandingCard: React.FC<PolicyUnderstandingCardProps> = (
           </span>
         </div>
       </div>
+
+      {/* Grounded Empirical Proposal Parameters */}
+      {pu && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/90">
+          <div className="flex flex-col justify-center">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Stated Budget</span>
+            <span className="text-xs font-black text-slate-900 mt-0.5">{pu.budget}</span>
+          </div>
+          <div className="flex flex-col justify-center">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Affected Population</span>
+            <span className="text-xs font-black text-slate-900 mt-0.5">{pu.affectedPopulation}</span>
+          </div>
+          <div className="flex flex-col justify-center">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Land Type / Zoning</span>
+            <span className="text-xs font-black text-slate-900 mt-0.5">{pu.landType}</span>
+          </div>
+          <div className="flex flex-col justify-center">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Sector & Asset</span>
+            <span className="text-xs font-semibold text-slate-800 mt-0.5 truncate">{pu.sector} • {pu.asset}</span>
+          </div>
+        </div>
+      )}
 
       {/* Stated Reason & Grounded Demographic Context */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 text-xs">
@@ -346,6 +400,24 @@ export const PolicyUnderstandingCard: React.FC<PolicyUnderstandingCardProps> = (
           </div>
         )}
       </div>
+
+      {/* Identified Data Gaps & Information Required */}
+      {pu?.unknowns && pu.unknowns.length > 0 && (
+        <div className="bg-amber-50/70 border border-amber-200/90 rounded-xl p-3.5 space-y-1.5 text-xs">
+          <div className="flex items-center space-x-1.5 text-amber-900 font-bold">
+            <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+            <span>Administrative Data Gaps Identified (Strict Fact / Unknown Integrity):</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5 pt-1">
+            {pu.unknowns.map((unk, idx) => (
+              <div key={idx} className="flex items-start space-x-1.5 text-[11px] text-amber-950 font-medium">
+                <span className="text-amber-500 font-bold">•</span>
+                <span>{unk}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Constraints */}
       {policy.constraints && policy.constraints.length > 0 && (

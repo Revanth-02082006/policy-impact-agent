@@ -19,6 +19,7 @@ import {
   FrictionClassification,
   getGainClassification,
   getFrictionClassification,
+  StructuredProposalUnderstanding,
 } from './types.js';
 import {
   resolveLocationAdministrativeProfile,
@@ -44,59 +45,13 @@ export type PolicyArchetype =
   | 'environmental_destruction_loss'
   | 'general_destructive_harm'
   | 'general_administrative';
+import {
+  classifyProposalMeaning,
+  extractStructuredProposalUnderstanding,
+} from './proposalUnderstanding.js';
 
 export function classifyPolicy(description: string, department?: string): PolicyCategory {
-  const text = `${description} ${department || ''}`.toLowerCase();
-
-  if (text.includes('dam') || text.includes('water release') || text.includes('reservoir') || text.includes('canal') || text.includes('irrigation') || text.includes('river')) {
-    return 'Water Resources';
-  }
-  if (text.includes('factory') || text.includes('industrial') || text.includes('manufacturing') || text.includes('textile') || text.includes('corridor') || text.includes('sipcot') || text.includes('tidco')) {
-    return 'Industry';
-  }
-  if (text.includes('hospital') || text.includes('clinic') || text.includes('health') || text.includes('medical') || text.includes('ambulance') || text.includes('vaccine') || text.includes('phc') || text.includes('multi specialty') || text.includes('speciality')) {
-    return 'Healthcare';
-  }
-  if (text.includes('school') || text.includes('college') || text.includes('university') || text.includes('education') || text.includes('student') || text.includes('classroom') || text.includes('campus')) {
-    return 'Education';
-  }
-  if (text.includes('waste') || text.includes('treatment plant') || text.includes('recycling') || text.includes('pollution') || text.includes('wetland') || text.includes('emission') || text.includes('forest') || text.includes('tree') || text.includes('solar') || text.includes('wind') || text.includes('park') || text.includes('green')) {
-    return 'Environment';
-  }
-  if (text.includes('flood') || text.includes('cyclone') || text.includes('evacuate') || text.includes('relief camp') || text.includes('disaster') || text.includes('warning') || text.includes('storm') || text.includes('landslide')) {
-    return 'Disaster Management';
-  }
-  if (text.includes('bus') || text.includes('traffic') || text.includes('metro') || text.includes('train') || text.includes('railway') || text.includes('one-way') || text.includes('diversion') || text.includes('flyover') || text.includes('highway') || text.includes('bypass') || text.includes('elevated corridor')) {
-    return 'Transport';
-  }
-  if (text.includes('bridge') || text.includes('road') || text.includes('tunnel') || text.includes('pipeline') || text.includes('drainage') || text.includes('infrastructure') || text.includes('utility')) {
-    return 'Infrastructure';
-  }
-  if (text.includes('relocate') || text.includes('families') || text.includes('housing') || text.includes('slum') || text.includes('tenement') || text.includes('colony') || text.includes('resettlement')) {
-    return 'Housing';
-  }
-  if (text.includes('farmland') || text.includes('farm land') || text.includes('agriculture') || text.includes('agricultut') || text.includes('agri') || text.includes('crop') || text.includes('farmer') || text.includes('paddy') || text.includes('grain') || text.includes('cultivable') || text.includes('agrarian')) {
-    return 'Agriculture';
-  }
-  if (text.includes('forest') || text.includes('trees') || text.includes('tree') || text.includes('wildlife') || text.includes('sanctuary') || text.includes('biodiversity')) {
-    return 'Forest';
-  }
-  if (text.includes('police') || text.includes('cctv') || text.includes('street light') || text.includes('surveillance') || text.includes('patrol') || text.includes('checkpoint') || text.includes('law and order')) {
-    return 'Public Safety';
-  }
-  if (text.includes('zoning') || text.includes('master plan') || text.includes('land acquire') || text.includes('land acquisition') || text.includes('urban')) {
-    return 'Urban Planning';
-  }
-  if (text.includes('tax') || text.includes('toll') || text.includes('revenue') || text.includes('cess') || text.includes('levy') || text.includes('stamp duty')) {
-    return 'Revenue';
-  }
-  if (text.includes('municipal') || text.includes('panchayat') || text.includes('corporation') || text.includes('ward') || text.includes('civic') || text.includes('sanitation')) {
-    return 'Municipal Administration';
-  }
-  if (text.includes('tourism') || text.includes('monument') || text.includes('temple') || text.includes('heritage') || text.includes('resort')) {
-    return 'Tourism';
-  }
-  return 'Others';
+  return classifyProposalMeaning(description, department).primaryDomain;
 }
 
 export interface PolicyIntentEvaluation {
@@ -1825,48 +1780,54 @@ export function buildBalancedDecisionEvaluation(
 
 export function generateGenericFallbackResult(input: ScenarioInput): SimulationResult {
   const description = input.description || 'Proposed Government Administrative Policy';
-  const category = classifyPolicy(description, input.department);
+
+  // STEP 1: EXTRACT STRUCTURED PROPOSAL UNDERSTANDING (Runs BEFORE everything else!)
+  const proposalUnderstanding = extractStructuredProposalUnderstanding(input);
+  const category = proposalUnderstanding.primaryDomain as PolicyCategory;
   const intent = detectPolicyIntentAndArchetype(description, category);
   const archetype = intent.archetype;
 
   const loc = input.location || [input.village, input.town || input.city, input.district, 'Tamil Nadu'].filter(Boolean).join(', ') || 'Tamil Nadu, India';
-  const targetAsset = input.selectedAsset || determineTargetAsset(description, archetype);
+  const targetAsset = input.selectedAsset || proposalUnderstanding.asset || determineTargetAsset(description, archetype);
 
   // Real-World Geographic & Environmental Context Analysis
   const locationProfile = resolveLocationAdministrativeProfile(input);
 
-  // 1. Policy Understanding with all 12 dimensions
+  // 1. Policy Understanding with all dimensions derived from proposalUnderstanding
   const policy: PolicyUnderstanding = {
-    decisionType: determineDecisionType(description, archetype, category),
-    department: input.department || determineDepartment(archetype, category),
+    decisionType: determineDecisionType(description, archetype, category, proposalUnderstanding),
+    department: input.department || determineDepartment(archetype, category, proposalUnderstanding),
     location: loc,
     affectedArea: input.area ? `${input.area} Development Zone` : `${loc} Administrative Corridor`,
-    duration: input.duration || determineTimeline(archetype),
-    reason: input.reason || determineRationale(description, archetype),
-    scale: determineScale(description),
-    stakeholders: determineStakeholders(archetype),
+    duration: input.duration || determineTimeline(archetype, description),
+    reason: input.reason || determineRationale(description, archetype, proposalUnderstanding),
+    scale: determineScale(description, proposalUnderstanding),
+    stakeholders: determineStakeholders(archetype, proposalUnderstanding),
     infrastructure: [
       targetAsset,
       'Regional Connector Roads & Feeder Corridors',
       'TANGEDCO Electric Power Distribution Feeder',
       'TWAD / Municipal Water & Drainage Linkages',
     ],
-    resourcesRequired: [
-      'Administrative Sanction & Cabinet Expenditure Clearance',
-      'Statutory Approvals (Town Planning, Environmental NOC, Fire NOC)',
-      'Project Management Unit & Civil Contracting Fleet',
-      'Public Stakeholder Facilitation & Information Desk',
-    ],
-    urgency: determineUrgency(description),
-    confidenceScore: 92,
+    resourcesRequired: proposalUnderstanding.requiredApprovals,
+    urgency: proposalUnderstanding.urgency,
+    confidenceScore: proposalUnderstanding.confidence,
     category,
-    summary: `Dual-aspect impact simulation analyzing both positive societal benefits and implementation frictions for: "${description}" in ${loc}.`,
-    action: 'Simulated Administrative Action',
+    summary: `Structured administrative impact evaluation for: "${description}" in ${loc}. Primary Domain: ${category}.`,
+    action: proposalUnderstanding.primaryAction,
     asset: targetAsset,
+    proposalUnderstanding,
+    secondaryDomains: proposalUnderstanding.secondaryDomains,
+    administrativeLevel: proposalUnderstanding.administrativeLevel,
+    budget: proposalUnderstanding.budget,
+    landType: proposalUnderstanding.landType,
+    unknowns: proposalUnderstanding.unknowns,
+    explicitStakeholders: proposalUnderstanding.explicitStakeholders,
+    inferredStakeholders: proposalUnderstanding.inferredStakeholders,
     constraints: [
-      input.constraints || 'Preserve uninterrupted emergency medical transit during all execution phases',
-      'Enforce Tamil Nadu Pollution Control Board (TNPCB) dust & noise standards',
-      'Implement proactive citizen communication and public grievance redressal mechanisms',
+      input.constraints || 'Preserve uninterrupted emergency transit and public welfare standards during all execution phases',
+      'Enforce Tamil Nadu Pollution Control Board (TNPCB) statutory environmental guidelines',
+      'Implement proactive citizen communication and transparent public grievance redressal mechanisms',
     ],
     dataSource: input.selectedAssetSource || 'simulation_estimate',
   };
@@ -2005,6 +1966,7 @@ export function generateGenericFallbackResult(input: ScenarioInput): SimulationR
     netViability,
     balancedEvaluation,
     locationContextAnalysis: locationProfile,
+    proposalUnderstanding,
     disclaimer: MANDATORY_DISCLAIMER,
     populationContext: (() => {
       const popMatch = description.match(/(\d+[\d,]*)\s*(families|residents|people|households|citizens|villagers)/i);
@@ -6002,7 +5964,15 @@ function determineTargetAsset(description: string, archetype: PolicyArchetype): 
   return 'Designated Administrative Asset / Sector';
 }
 
-function determineDecisionType(description: string, archetype: PolicyArchetype, category: PolicyCategory): string {
+function determineDecisionType(
+  description: string,
+  archetype: PolicyArchetype,
+  category: PolicyCategory,
+  proposalUnderstanding?: StructuredProposalUnderstanding
+): string {
+  if (proposalUnderstanding?.primaryAction) {
+    return proposalUnderstanding.primaryAction;
+  }
   if (archetype === 'agricultural_destruction_hazard') return 'Proposed Agricultural Land Acquisition & Non-Agrarian Diversion';
   if (archetype === 'environmental_destruction_loss') return 'Ecological Resource Extraction & Land Clearance';
   if (archetype === 'general_destructive_harm') return 'Administrative Interventional Directive';
@@ -6023,128 +5993,83 @@ function determineDecisionType(description: string, archetype: PolicyArchetype, 
   return 'Strategic Administrative & Public Works Policy';
 }
 
-function determineDepartment(archetype: PolicyArchetype, category: PolicyCategory): string {
-  if (archetype === 'agricultural_destruction_hazard') return 'Agriculture and Farmers Welfare & Revenue Department';
-  if (archetype === 'environmental_destruction_loss') return 'Environment, Climate Change and Forests Department';
-  if (archetype === 'general_destructive_harm') return 'General Administration & Public Works Department';
-  if (archetype === 'displacement_relocation_industrial' || archetype === 'forced_eviction_resettlement') {
-    return 'Revenue and Disaster Management & Industries Department';
+function determineDepartment(
+  archetype: PolicyArchetype,
+  category: PolicyCategory,
+  proposalUnderstanding?: StructuredProposalUnderstanding
+): string {
+  if (proposalUnderstanding?.responsibleDepartment && proposalUnderstanding.responsibleDepartment !== 'Requires Administrative Verification') {
+    return proposalUnderstanding.responsibleDepartment;
   }
-  if (archetype === 'polluting_industry_hazard') {
-    return 'Environment, Climate Change and Forests & Industries Department';
-  }
-  if (archetype === 'healthcare_hospital') return 'Health and Family Welfare Department';
-  if (archetype === 'education_hub') return 'Higher Education Department';
-  if (archetype === 'transport_corridor') return 'Highways and Minor Ports Department';
-  if (archetype === 'clean_energy_environment') return 'Environment, Climate Change and Forests Department';
-  if (archetype === 'industrial_zone') return 'Industries, Investment Promotion and Commerce Department';
-  if (archetype === 'water_dam') return 'Water Resources Department';
-  if (archetype === 'traffic_regulation') return 'Home (Police) & Transport Department';
-  if (archetype === 'urban_housing') return 'Housing and Urban Development Department';
-  return 'Municipal Administration and Water Supply Department';
+  if (category === 'Governance / Public Administration') return 'Public Works Department (Buildings) & Legislative Assembly Secretariat';
+  if (category === 'Transport Infrastructure' || category === 'Transport') return 'Highways and Minor Ports Department';
+  if (category === 'Industry / Economic Development' || category === 'Industry') return 'Industries, Investment Promotion and Commerce Department';
+  if (category === 'Healthcare') return 'Health and Family Welfare Department';
+  if (category === 'Education') return 'Higher Education Department';
+  if (category === 'Water Resources' || category === 'Water Resources / Disaster Resilience') return 'Water Resources Department (WRD)';
+  if (category === 'Municipal Infrastructure / Water & Sanitation' || category === 'Municipal Administration') return 'Municipal Administration and Water Supply Department';
+  return 'Requires Administrative Verification';
 }
 
-function determineTimeline(archetype: PolicyArchetype): string {
-  if (archetype === 'agricultural_destruction_hazard') return 'High Risk of High Court Agrarian Stay (Estimated 18-24 Months Litigation)';
-  if (archetype === 'environmental_destruction_loss') return 'Subject to NGT Injunctions & Statutory Forest Clearance (12-24 Months)';
-  if (archetype === 'general_destructive_harm') return 'Subject to Administrative Review & Restructuring (60-90 Days)';
-  if (archetype === 'displacement_relocation_industrial' || archetype === 'forced_eviction_resettlement') {
-    return 'Indefinite / High Risk of Judicial Stay (Estimated 24-36 Months Litigation)';
+function determineTimeline(archetype: PolicyArchetype, description?: string): string {
+  if (description) {
+    const timeMatch = description.match(/(\d+)\s*(months?|years?|days?|weeks?)/i);
+    if (timeMatch) {
+      return `${timeMatch[1]} ${timeMatch[2]} (Stated in proposal)`;
+    }
   }
-  if (archetype === 'polluting_industry_hazard') {
-    return 'Subject to EIA Clearances & Public Hearing (12-18 Months)';
-  }
-  if (archetype === 'healthcare_hospital') return '18 Months Phased Civil & Clinical Handover';
-  if (archetype === 'education_hub') return '12 Months Academic Cycle Handover';
-  if (archetype === 'transport_corridor') return '24 Months Phased Construction';
-  if (archetype === 'clean_energy_environment') return '9 Months Accelerated Commissioning';
-  if (archetype === 'industrial_zone') return '18 Months Infrastructure Layout';
-  if (archetype === 'water_dam') return '7 Days Regulated Hydraulic Window';
-  if (archetype === 'traffic_regulation') return 'Immediate Administrative Enforcement (90-day review)';
-  return '90 Days Standard Phased Execution';
+  return 'Unstated in proposal (Subject to administrative DPR / project sanction)';
 }
 
-function determineRationale(description: string, archetype: PolicyArchetype): string {
-  if (archetype === 'agricultural_destruction_hazard') return 'Evaluating proposed farmland conversion against rural food security, farmer livelihood preservation, and constitutional agrarian rights';
-  if (archetype === 'environmental_destruction_loss') return 'Assessing ecological loss, carbon sink depletion, and water aquifer degradation against statutory environmental standards';
-  if (archetype === 'general_destructive_harm') return 'Evaluating administrative proposal for disproportionate citizen disruption, asset impairment, and public friction';
-  if (archetype === 'displacement_relocation_industrial' || archetype === 'forced_eviction_resettlement') {
-    return 'Evaluating proposed industrial land acquisition against statutory human rehabilitation safeguards, constitutional housing rights, and environmental pollution standards';
+function determineRationale(
+  description: string,
+  archetype: PolicyArchetype,
+  proposalUnderstanding?: StructuredProposalUnderstanding
+): string {
+  if (proposalUnderstanding?.positiveObjectives?.[0]) {
+    return proposalUnderstanding.positiveObjectives[0];
   }
-  if (archetype === 'healthcare_hospital') return 'Expanding critical tertiary clinical capacity, golden hour trauma survival, and accessible super-specialty healthcare for citizens';
-  if (archetype === 'education_hub') return 'Fostering youth human capital, professional skills, and higher education gross enrollment ratio';
-  if (archetype === 'transport_corridor') return 'Eliminating chronic urban gridlock, elevating transit velocity, and safeguarding pedestrian safety';
-  if (archetype === 'clean_energy_environment') return 'Advancing carbon neutrality, clean power generation, and ecological conservation';
-  if (archetype === 'industrial_zone') return 'Driving manufacturing employment, export capacity, and sustainable industrial growth';
-  if (archetype === 'water_dam') return 'Balancing reservoir structural safety with downstream agricultural irrigation and flood buffer protection';
-  return 'Advancing public welfare, economic throughput, and civic administrative standards';
+  if (proposalUnderstanding?.proposalObjective) {
+    return proposalUnderstanding.proposalObjective;
+  }
+  return `Administrative policy evaluation for "${description}".`;
 }
 
-function determineScale(description: string): 'Local' | 'Zonal' | 'City-wide' | 'District-wide' | 'Regional' | 'State-wide' {
+function determineScale(
+  description: string,
+  proposalUnderstanding?: StructuredProposalUnderstanding
+): 'Local' | 'Zonal' | 'City-wide' | 'District-wide' | 'Regional' | 'State-wide' {
+  if (proposalUnderstanding?.scale) {
+    switch (proposalUnderstanding.scale) {
+      case 'State': return 'State-wide';
+      case 'Regional': return 'Regional';
+      case 'District': return 'District-wide';
+      case 'City': return 'City-wide';
+      case 'Ward': return 'Zonal';
+      default: return 'Local';
+    }
+  }
   const text = description.toLowerCase();
   if (text.includes('state') || text.includes('all district')) return 'State-wide';
-  if (text.includes('district') || text.includes('tiruppur') || text.includes('coimbatore') || text.includes('madurai') || text.includes('salem') || text.includes('trichy') || text.includes('hospital')) return 'District-wide';
+  if (text.includes('district') || text.includes('hospital')) return 'District-wide';
   if (text.includes('region') || text.includes('corridor') || text.includes('dam')) return 'Regional';
-  if (text.includes('city') || text.includes('metro') || text.includes('center')) return 'City-wide';
-  if (text.includes('zone') || text.includes('ward') || text.includes('sector')) return 'Zonal';
+  if (text.includes('city') || text.includes('metro')) return 'City-wide';
+  if (text.includes('zone') || text.includes('ward')) return 'Zonal';
   return 'Local';
 }
 
-function determineStakeholders(archetype: PolicyArchetype): string[] {
-  if (archetype === 'agricultural_destruction_hazard') {
-    return [
-      'Agricultural Landowners & Cultivating Farmers',
-      'Tenant Cultivators & Agricultural Laborers',
-      'District Revenue Officer (DRO) & Land Acquisition Authority',
-      'Department of Agriculture and Farmers Welfare',
-      'Local Mandi & Agricultural Produce Market Committees (APMC)',
-      'Farmer Associations & Peasant Unions',
-      'Water Resources & Irrigation Sluice Engineers',
-    ];
-  }
-  if (archetype === 'environmental_destruction_loss') {
-    return [
-      'Local Residents & Citizen Welfare Associations',
-      'Environment, Climate Change and Forests Department',
-      'Tamil Nadu Pollution Control Board (TNPCB)',
-      'National Green Tribunal (NGT) & Environmental Legal Advocates',
-      'Urban Public Health & Respiratory Welfare Groups',
-    ];
-  }
-  if (archetype === 'general_destructive_harm') {
-    return [
-      'Affected Community Residents & Commercial Traders',
-      'District Collectorate & Municipal Administration',
-      'Civil Society Groups & Legal Counsel',
-    ];
-  }
-  if (archetype === 'displacement_relocation_industrial' || archetype === 'forced_eviction_resettlement' || archetype === 'polluting_industry_hazard') {
-    return [
-      'Affected Resident Families',
-      'District Revenue Officer (DRO) & Land Acquisition Tehsildar',
-      'Tamil Nadu Pollution Control Board (TNPCB)',
-      'Department of Industries, Investment Promotion and Commerce',
-      'Local Grama Sabha & Village Panchayat Leadership',
-      'Agricultural & Informal Labor Associations',
-      'Human Rights & Environmental Legal Advocates',
-    ];
-  }
-  if (archetype === 'healthcare_hospital') {
-    return [
-      'District Residents & Rural Patient Families',
-      'Emergency Medical & 108 Ambulance Personnel',
-      'Medical Professionals & Allied Health Staff',
-      'Chief Minister’s Comprehensive Health Insurance (CMCHIS) Directorate',
-      'Local Retailers, Pharmacies & Diagnostic Providers',
-      'Tamil Nadu Pollution Control Board (TNPCB)',
-    ];
+function determineStakeholders(
+  archetype: PolicyArchetype,
+  proposalUnderstanding?: StructuredProposalUnderstanding
+): string[] {
+  if (proposalUnderstanding) {
+    const list = [...proposalUnderstanding.explicitStakeholders, ...proposalUnderstanding.inferredStakeholders];
+    if (list.length > 0) return Array.from(new Set(list));
   }
   return [
     'Local Citizens & Resident Welfare Associations',
     'District Collectorate & Municipal Administration',
-    'Commercial Traders & Business Chambers',
-    'Emergency Health & Fire Services Command',
-    'Tamil Nadu State Transport Corporation (TNSTC)',
+    'Civil Society & Public Stakeholders',
   ];
 }
 

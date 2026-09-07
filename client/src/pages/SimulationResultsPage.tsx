@@ -300,6 +300,7 @@ export const SimulationResultsPage: React.FC<SimulationResultsPageProps> = ({
           policy={policy}
           populationContext={simulation.populationContext}
           locationContextAnalysis={simulation.locationContextAnalysis}
+          proposalUnderstanding={simulation.proposalUnderstanding || policy.proposalUnderstanding}
         />
       )}
 

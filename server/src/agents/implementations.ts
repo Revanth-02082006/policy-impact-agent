@@ -8,62 +8,10 @@ import {
 } from '../types.js';
 import { AgentExecutionContext, PolicySimulationAgent } from './baseAgent.js';
 
+import { classifyProposalMeaning } from '../proposalUnderstanding.js';
+
 export function classifyPolicy(description: string, department?: string): PolicyCategory {
-  const text = `${description} ${department || ''}`.toLowerCase();
-
-  if (text.includes('dam') || text.includes('water release') || text.includes('reservoir') || text.includes('canal') || text.includes('irrigation') || text.includes('river')) {
-    return 'Water Resources';
-  }
-  if (text.includes('factory') || text.includes('industrial') || text.includes('manufacturing') || text.includes('textile') || text.includes('corridor') || text.includes('sipcot') || text.includes('tidco')) {
-    return 'Industry';
-  }
-  if (text.includes('hospital') || text.includes('clinic') || text.includes('health') || text.includes('medical') || text.includes('ambulance') || text.includes('vaccine') || text.includes('phc')) {
-    return 'Healthcare';
-  }
-  if (text.includes('school') || text.includes('college') || text.includes('university') || text.includes('education') || text.includes('student') || text.includes('classroom')) {
-    return 'Education';
-  }
-  if (text.includes('waste') || text.includes('treatment plant') || text.includes('recycling') || text.includes('pollution') || text.includes('wetland') || text.includes('emission') || text.includes('forest') || text.includes('tree')) {
-    return 'Environment';
-  }
-  if (text.includes('flood') || text.includes('cyclone') || text.includes('evacuate') || text.includes('relief camp') || text.includes('disaster') || text.includes('warning') || text.includes('storm') || text.includes('landslide')) {
-    return 'Disaster Management';
-  }
-  if (text.includes('solar') || text.includes('wind') || text.includes('power plant') || text.includes('substation') || text.includes('grid') || text.includes('electricity') || text.includes('energy')) {
-    return 'Energy';
-  }
-  if (text.includes('bus') || text.includes('traffic') || text.includes('metro') || text.includes('train') || text.includes('railway') || text.includes('one-way') || text.includes('diversion') || text.includes('flyover') || text.includes('highway') || text.includes('bypass')) {
-    return 'Transport';
-  }
-  if (text.includes('bridge') || text.includes('road') || text.includes('construct') || text.includes('tunnel') || text.includes('pipeline') || text.includes('drainage') || text.includes('infrastructure') || text.includes('utility')) {
-    return 'Infrastructure';
-  }
-  if (text.includes('relocate') || text.includes('families') || text.includes('housing') || text.includes('slum') || text.includes('tenement') || text.includes('colony') || text.includes('resettlement')) {
-    return 'Housing';
-  }
-  if (text.includes('farmland') || text.includes('farm land') || text.includes('agriculture') || text.includes('agricultut') || text.includes('agri') || text.includes('crop') || text.includes('farmer') || text.includes('paddy') || text.includes('grain') || text.includes('cultivable') || text.includes('agrarian')) {
-    return 'Agriculture';
-  }
-  if (text.includes('forest') || text.includes('trees') || text.includes('tree') || text.includes('wildlife') || text.includes('sanctuary') || text.includes('biodiversity')) {
-    return 'Forest';
-  }
-  if (text.includes('police') || text.includes('cctv') || text.includes('street light') || text.includes('surveillance') || text.includes('patrol') || text.includes('checkpoint') || text.includes('law and order')) {
-    return 'Public Safety';
-  }
-  if (text.includes('zoning') || text.includes('master plan') || text.includes('land acquire') || text.includes('land acquisition') || text.includes('urban') || text.includes('corridor')) {
-    return 'Urban Planning';
-  }
-  if (text.includes('tax') || text.includes('toll') || text.includes('revenue') || text.includes('cess') || text.includes('levy') || text.includes('stamp duty')) {
-    return 'Revenue';
-  }
-  if (text.includes('municipal') || text.includes('panchayat') || text.includes('corporation') || text.includes('ward') || text.includes('civic') || text.includes('sanitation')) {
-    return 'Municipal Administration';
-  }
-  if (text.includes('tourism') || text.includes('monument') || text.includes('temple') || text.includes('heritage') || text.includes('resort')) {
-    return 'Tourism';
-  }
-
-  return 'Others';
+  return classifyProposalMeaning(description, department).primaryDomain;
 }
 
 // 1. Transport Impact Agent

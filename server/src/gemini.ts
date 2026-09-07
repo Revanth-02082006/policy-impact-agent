@@ -26,6 +26,7 @@ import {
 import { findInfrastructure, InfrastructureLookupResult } from './infrastructure.js';
 import { AgentRegistry } from './agents/registry.js';
 import { classifyPolicy } from './agents/implementations.js';
+import { extractStructuredProposalUnderstanding } from './proposalUnderstanding.js';
 
 export async function runGeminiSimulation(input: ScenarioInput): Promise<SimulationResult> {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -119,7 +120,8 @@ function buildOrchestrationPrompt(
 ): string {
   const locationTitle = [infra.resolvedArea, input.town || input.city, input.district, 'Tamil Nadu'].filter(Boolean).join(', ');
   const targetAsset = input.selectedAsset || input.description;
-  const inferredCategory = classifyPolicy(input.description, input.department);
+  const structuredUnderstanding = extractStructuredProposalUnderstanding(input);
+  const inferredCategory = structuredUnderstanding.primaryDomain;
 
   return `You are an experienced Municipal Administration Decision Analyst whose responsibility is to protect public welfare, environmental sustainability, legal compliance, and efficient municipal governance. You must never act like a project promoter, investment advisor, marketing assistant, or policy supporter. Every proposal must be critically evaluated with neutrality, caution, and evidence-based administrative reasoning.
 
@@ -145,6 +147,27 @@ FOUR INTERDEPENDENT EVALUATION INPUTS:
      * Dam flood water release: Gain 75–85, Friction 20–30. Dam drought water diversion: Gain 10–20, Friction 90–98.
      * Road widening on vacant bypass: Gain 70–80, Friction 24–34. Road widening in dense residential/bazaar street: Gain 25–35, Friction 82–94.
 
+PROPOSAL UNDERSTANDING & CLASSIFICATION (GROUND TRUTH PRE-ANALYSIS):
+- Objective: ${structuredUnderstanding.proposalObjective}
+- Primary Action: ${structuredUnderstanding.primaryAction}
+- Asset / Project: ${structuredUnderstanding.asset}
+- Sector: ${structuredUnderstanding.sector}
+- Primary Administrative Domain: "${structuredUnderstanding.primaryDomain}"
+- Secondary Affected Domains: ${structuredUnderstanding.secondaryDomains.join(', ') || 'None'}
+- Responsible Department: "${structuredUnderstanding.responsibleDepartment}"
+- Lead Administrative Authority: "${structuredUnderstanding.leadAdministrativeAuthority}"
+- Administrative Level: ${structuredUnderstanding.administrativeLevel}
+- Operational Scale: ${structuredUnderstanding.scale}
+- Stated Budget: "${structuredUnderstanding.budget}"
+- Stated Affected Population: "${structuredUnderstanding.affectedPopulation}"
+- Stated Land Type: "${structuredUnderstanding.landType}"
+- Explicit Stakeholders: ${structuredUnderstanding.explicitStakeholders.join(', ') || 'None explicitly stated'}
+- Inferred Stakeholders: ${structuredUnderstanding.inferredStakeholders.join(', ')}
+- Critical Unknowns / Data Gaps: ${structuredUnderstanding.unknowns.join('; ')}
+
+MANDATORY CLASSIFICATION MANDATE:
+Do NOT reclassify the proposal into unrelated domains based on isolated words (for example, NEVER classify a Legislative Assembly as Education just because the word "campus" appears). The Primary Administrative Domain is "${structuredUnderstanding.primaryDomain}".
+
 PRIMARY SOURCE OF TRUTH MANDATE (STRICT RULES):
 The user's proposal must be treated as the PRIMARY SOURCE OF TRUTH.
 1. DO NOT invent facts about the proposal.
@@ -169,9 +192,9 @@ VICINITY INVENTORY (For municipal background only):
 - Transit Links in Area: ${infra.transitLinks?.map(t => t.name).join(', ') || 'State Highway Corridors'}
 PROPOSED GOVERNMENT DECISION: "${input.description}"
 PRE-CLASSIFIED DOMAIN HINT: "${inferredCategory}"
-SPECIFIED DEPARTMENT: "${input.department || 'Appropriate Government Department'}"
-DURATION / TIMELINE: "${input.duration || 'Proposed administrative timeline'}"
-REASON / RATIONALE: "${input.reason || 'Strategic administrative proposal'}"
+SPECIFIED DEPARTMENT: "${structuredUnderstanding.responsibleDepartment}"
+DURATION / TIMELINE: "${input.duration || structuredUnderstanding.unknowns.find(u => u.includes('duration')) || 'Proposed administrative timeline'}"
+REASON / RATIONALE: "${input.reason || structuredUnderstanding.proposalObjective}"
 CONSTRAINTS: "${input.constraints || 'Maintain emergency services & public safety'}"
 
 YOUR RESPONSIBILITIES:
@@ -578,25 +601,28 @@ function formatGeminiResponseToSimulationResult(
     polarity: finalPolarity,
   };
 
+  const structuredUnderstanding = extractStructuredProposalUnderstanding(input);
+
   const policy: PolicyUnderstanding = {
-    decisionType: parsed.policy?.decisionType || 'Administrative Policy Decision',
-    department: parsed.policy?.department || input.department || 'District Administration',
+    decisionType: parsed.policy?.decisionType || structuredUnderstanding.primaryAction || 'Administrative Policy Decision',
+    department: parsed.policy?.department || structuredUnderstanding.responsibleDepartment || 'District Administration',
     location: locationTitle,
     affectedArea: parsed.policy?.affectedArea || `${infra.resolvedArea} Impact Sector`,
-    duration: parsed.policy?.duration || input.duration || '90 Days',
-    reason: parsed.policy?.reason || input.reason || 'Public interest infrastructure & governance upgrade',
-    scale: parsed.policy?.scale || 'Zonal',
-    stakeholders: parsed.policy?.stakeholders || ['Residents', 'Local Businesses', 'Emergency Services'],
-    infrastructure: parsed.policy?.infrastructure || [targetAsset],
+    duration: parsed.policy?.duration || input.duration || 'Unstated in proposal (Subject to administrative DPR / project sanction)',
+    reason: parsed.policy?.reason || structuredUnderstanding.proposalObjective || 'Public interest infrastructure & governance upgrade',
+    scale: parsed.policy?.scale || (structuredUnderstanding.scale as any) || 'Zonal',
+    stakeholders: parsed.policy?.stakeholders || (structuredUnderstanding.explicitStakeholders.length > 0 ? structuredUnderstanding.explicitStakeholders : ['Residents', 'Local Businesses', 'Emergency Services']),
+    infrastructure: parsed.policy?.infrastructure || [structuredUnderstanding.asset || targetAsset],
     resourcesRequired: parsed.policy?.resourcesRequired || ['Personnel', 'Civil Equipment', 'Statutory Approvals'],
-    urgency: parsed.policy?.urgency || 'Standard',
-    confidenceScore: parsed.policy?.confidenceScore || 88,
-    category: parsed.policy?.category || classifyPolicy(input.description, input.department),
-    summary: parsed.policy?.summary || input.description,
-    action: parsed.policy?.decisionType || 'Proposed Action',
+    urgency: parsed.policy?.urgency || (structuredUnderstanding.urgency as any) || 'Standard',
+    confidenceScore: parsed.policy?.confidenceScore || structuredUnderstanding.confidence || 88,
+    category: (structuredUnderstanding.primaryDomain as PolicyCategory) || parsed.policy?.category || classifyPolicy(input.description, input.department),
+    summary: parsed.policy?.summary || structuredUnderstanding.proposalObjective || input.description,
+    action: parsed.policy?.decisionType || structuredUnderstanding.primaryAction || 'Proposed Action',
     asset: targetAsset,
     constraints: parsed.policy?.constraints || ['Preserve emergency hospital access'],
     dataSource: 'verified_geographic_data',
+    proposalUnderstanding: structuredUnderstanding,
   };
 
   const alternatives = parsed.alternatives || [];
@@ -688,6 +714,7 @@ function formatGeminiResponseToSimulationResult(
       locContext
     ),
     locationContextAnalysis: locContext,
+    proposalUnderstanding: structuredUnderstanding,
     disclaimer: MANDATORY_DISCLAIMER,
   };
 }

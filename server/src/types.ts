@@ -11,15 +11,21 @@ export type DataProvenance =
 export type PolicyCategory =
   | 'Infrastructure'
   | 'Transport'
+  | 'Transport Infrastructure'
   | 'Disaster Management'
   | 'Urban Planning'
   | 'Municipal Administration'
+  | 'Municipal Infrastructure / Water & Sanitation'
   | 'Water Resources'
+  | 'Water Resources / Disaster Resilience'
   | 'Public Safety'
   | 'Healthcare'
   | 'Education'
   | 'Environment'
   | 'Industry'
+  | 'Industry / Economic Development'
+  | 'Land Use / Urban & Regional Development'
+  | 'Governance / Public Administration'
   | 'Agriculture'
   | 'Energy'
   | 'Housing'
@@ -28,6 +34,32 @@ export type PolicyCategory =
   | 'Forest'
   | 'Tourism'
   | 'Others';
+
+export interface StructuredProposalUnderstanding {
+  proposalObjective: string;
+  primaryAction: string;
+  asset: string;
+  sector: string;
+  primaryDomain: string;
+  secondaryDomains: string[];
+  responsibleDepartment: string;
+  leadAdministrativeAuthority: string;
+  geographicLocation: string;
+  administrativeLevel: 'Village' | 'Town' | 'Municipality' | 'Corporation' | 'District' | 'State';
+  scale: 'Local' | 'Ward' | 'City' | 'District' | 'State' | 'Regional';
+  budget: string;
+  affectedPopulation: string;
+  landType: string;
+  explicitStakeholders: string[];
+  inferredStakeholders: string[];
+  positiveObjectives: string[];
+  potentialImpacts: string[];
+  potentialRisks: string[];
+  requiredApprovals: string[];
+  unknowns: string[];
+  urgency: 'Low' | 'Standard' | 'Urgent' | 'Emergency';
+  confidence: number;
+}
 
 export type AgentImpactDomain =
   | 'transport'
@@ -75,6 +107,15 @@ export interface PolicyUnderstanding {
   confidenceScore: number; // 0 to 100
   summary: string;
   category: PolicyCategory;
+  // Structured Proposal Understanding
+  proposalUnderstanding?: StructuredProposalUnderstanding;
+  secondaryDomains?: string[];
+  administrativeLevel?: 'Village' | 'Town' | 'Municipality' | 'Corporation' | 'District' | 'State';
+  budget?: string;
+  landType?: string;
+  unknowns?: string[];
+  explicitStakeholders?: string[];
+  inferredStakeholders?: string[];
   // Backward compatibility fields
   action?: string;
   asset?: string;
@@ -325,6 +366,7 @@ export interface SimulationResult {
       reasoning: string;
     };
   };
+  proposalUnderstanding?: StructuredProposalUnderstanding;
 }
 
 export type BalancedImpactLevel =
