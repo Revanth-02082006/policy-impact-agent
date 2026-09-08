@@ -897,9 +897,24 @@ export function analyzeLocationConditionedImpact(
   const compatReasons: string[] = [];
 
   // Land Use Suitability
+  const isCivicInstitutional =
+    proposal.primaryDomain.includes('Education') ||
+    proposal.primaryDomain.includes('Healthcare') ||
+    proposal.primaryDomain.includes('Governance');
+
+  const isTourismResort =
+    proposal.primaryDomain.includes('Tourism') ||
+    /(resort|hotel|hospitality|ecotourism)/i.test(fullText);
+
   if (isIndustrialZone) {
     compatScore += 18;
     compatReasons.push('Conforming industrial master plan zoning (+18)');
+  } else if (isCivicInstitutional) {
+    compatScore += 20;
+    compatReasons.push('Conforming civic institutional public-use land allocation (+20)');
+  } else if (isTourismResort && (locationProfile.zoningClassification === 'Hill & Forest Conservation Zone' || /hill|ghat|nilgiri/i.test(districtName))) {
+    compatScore -= 10;
+    compatReasons.push('Hill Area Conservation Authority (HACA) environmental clearance required (-10)');
   } else if (isAgriConversion) {
     compatScore -= 24;
     compatReasons.push('Severe conflict with fertile agricultural land use (-24)');
@@ -907,8 +922,16 @@ export function analyzeLocationConditionedImpact(
 
   // Environmental Suitability
   if (isEcoSensitive) {
-    compatScore -= 22;
-    compatReasons.push(`Proximity to sensitive water body (${districtProfile.majorWaterBodies[0] || 'river catchment'}) creates high ecological risk (-22)`);
+    if (isIndustrial) {
+      compatScore -= 22;
+      compatReasons.push(`Proximity to sensitive water body (${districtProfile.majorWaterBodies[0] || 'river catchment'}) creates high ecological risk (-22)`);
+    } else if (isTourismResort) {
+      compatScore -= 12;
+      compatReasons.push(`Sensitive mountain watershed / slope stability oversight under HACA (-12)`);
+    } else {
+      compatScore -= 6;
+      compatReasons.push('Water body buffer adherence required under TNCDBR 2019 (-6)');
+    }
   } else if (isIndustrialZone) {
     compatScore += 4;
     compatReasons.push('Standard industrial environmental management buffer (+4)');
@@ -918,6 +941,9 @@ export function analyzeLocationConditionedImpact(
   if (isIndustrialZone) {
     compatScore += 12;
     compatReasons.push('Pre-existing heavy industrial utility infrastructure (+12)');
+  } else if (isCivicInstitutional) {
+    compatScore += 8;
+    compatReasons.push('Readily integrates with municipal power, water, and road networks (+8)');
   } else if (isIndustrial && !isIndustrialZone) {
     compatScore -= 10;
     compatReasons.push('Greenfield site lacks industrial utilities (-10)');
@@ -927,6 +953,9 @@ export function analyzeLocationConditionedImpact(
   if (isIndustrial && locationProfile.isHighDensityResidential) {
     compatScore -= 16;
     compatReasons.push('Incompatible proximity to dense residential settlements (-16)');
+  } else if (isCivicInstitutional) {
+    compatScore += 10;
+    compatReasons.push('Provides high accessibility to citizen and student populations (+10)');
   } else if (isIndustrial && isIndustrialZone) {
     compatScore += 6;
     compatReasons.push('Planned buffer separation from residential populations (+6)');

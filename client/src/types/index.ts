@@ -33,6 +33,7 @@ export type PolicyCategory =
   | 'Police'
   | 'Forest'
   | 'Tourism'
+  | 'Tourism / Hospitality / Economic Development'
   | 'Others';
 
 export interface StructuredProposalUnderstanding {
@@ -71,6 +72,43 @@ export type AgentImpactDomain =
   | 'disaster_risk'
   | 'social'
   | 'policy_compliance';
+
+export type EvidenceRelevance =
+  | 'Direct'
+  | 'Indirect'
+  | 'Minimal/No Direct Impact'
+  | 'Insufficient Evidence';
+
+export interface ImpactEvidenceItem {
+  domain: AgentImpactDomain;
+  relevance: EvidenceRelevance;
+  direction: 'positive' | 'negative' | 'neutral' | 'unknown';
+  severity: ImpactSeverity;
+  magnitude: number; // 0 to 10
+  factEvidence: string[]; // verified facts from proposal & location context
+  potentialImpacts: string[]; // contextual potential effects
+  unknowns: string[]; // specific gaps/missing data
+  rationale: string;
+}
+
+export type ImpactEvidenceMatrix = Record<AgentImpactDomain, ImpactEvidenceItem>;
+
+export interface ScoreExplanation {
+  gainDrivers: { label: string; points: number; domain: AgentImpactDomain; reason: string }[];
+  frictionDrivers: { label: string; points: number; domain: AgentImpactDomain; reason: string }[];
+  baseGain: number;
+  baseFriction: number;
+  finalGain: number;
+  finalFriction: number;
+  netScore: number;
+  explanationText: string;
+}
+
+export interface ConsistencyValidationResult {
+  isConsistent: boolean;
+  issues: string[];
+  resolvedItems: string[];
+}
 
 export interface ScenarioInput {
   description: string;
@@ -430,6 +468,9 @@ export interface SimulationResult {
   };
   proposalUnderstanding?: StructuredProposalUnderstanding;
   locationImpactContext?: LocationImpactContext;
+  evidenceMatrix?: ImpactEvidenceMatrix;
+  scoreExplanation?: ScoreExplanation;
+  consistencyValidation?: ConsistencyValidationResult;
 }
 
 export type BalancedImpactLevel =

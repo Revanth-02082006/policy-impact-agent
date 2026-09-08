@@ -30,6 +30,17 @@ import {
 import {
   analyzeLocationConditionedImpact,
 } from './locationConditionedAnalysis.js';
+import {
+  detectProposalArchetypeProfile,
+  buildCanonicalImpactEvidenceMatrix,
+  computeEvidenceDrivenScores,
+  convertMatrixToAgentAnalyses,
+  buildContextualCascadingGraph,
+  buildContextualAlternatives,
+  buildContextualRecommendation,
+  buildContextualBalancedEvaluation,
+  validateOutputConsistency,
+} from './evidenceMatrixEngine.js';
 import { InfrastructureLookupResult } from './infrastructure.js';
 
 export const MANDATORY_DISCLAIMER =
@@ -1985,104 +1996,109 @@ export function generateGenericFallbackResult(input: ScenarioInput): SimulationR
     dataSource: input.selectedAssetSource || 'simulation_estimate',
   };
 
-  // 2. Generate Domain Analyses tailored to archetype with dual positive and negative findings
-  const rawAgentAnalyses = buildArchetypeAnalyses(archetype, description, policy, loc);
-  const agentAnalyses = applyConditionEvaluationsToAnalyses(rawAgentAnalyses, locationImpactContext);
-  const impactScores = computeImpactScores(agentAnalyses, intent.polarity, description, archetype, locationProfile, locationImpactContext);
+  // STEP 3: UPGRADE 3 — CANONICAL IMPACT EVIDENCE MATRIX ENGINE
+  // Single canonical matrix grounds all 9 domain analyses, scores, graphs, alternatives & recommendations
+  const profile = detectProposalArchetypeProfile(description, proposalUnderstanding);
+  const canonicalMatrix = buildCanonicalImpactEvidenceMatrix(
+    description,
+    proposalUnderstanding,
+    locationProfile,
+    locationImpactContext
+  );
+  const { gainScore, frictionScore, explanation: scoreExplanation } = computeEvidenceDrivenScores(canonicalMatrix, profile);
 
-  // 3. Cascading Graph with both Positive Catalytic Nodes and Managed Risk Nodes
-  const cascadingGraph = buildArchetypeCascadingGraph(archetype, description, policy, loc, locationImpactContext);
+  // 2. Domain Analyses derived directly from canonical matrix (100% evidence-grounded)
+  const agentAnalyses = convertMatrixToAgentAnalyses(canonicalMatrix, loc);
 
-  // 4. What-If Alternatives (Original vs A, B, C)
-  const alternatives = buildArchetypeAlternatives(archetype, description, policy, locationImpactContext);
+  // 3. Cascading Graph with isolated context and evidence-derived nodes
+  const cascadingGraph = buildContextualCascadingGraph(profile, canonicalMatrix, loc, description);
 
-  // 5. Explainable Recommendation
-  const recommendation = buildArchetypeRecommendation(archetype, description, policy, alternatives[1] || alternatives[0], locationImpactContext);
+  // 4. What-If Alternatives (Lower Score = Minimized Disruption strictly enforced)
+  const alternatives = buildContextualAlternatives(profile, canonicalMatrix, loc, frictionScore, gainScore, description);
 
-  const societalBenefit = impactScores.overallSocietalBenefit ?? (intent.polarity === 'negative' ? 14 : 50);
-  const isSeverelyUnfavorable =
-    intent.polarity === 'negative' ||
-    impactScores.overallPolicyRisk >= 68 ||
-    (impactScores.overallPolicyRisk - societalBenefit) >= 20 ||
-    (impactScores.netViabilityScore !== undefined && impactScores.netViabilityScore < 40);
-  const isConditional = impactScores.overallPolicyRisk >= 50 && !isSeverelyUnfavorable;
-  const isHighlyFavorable = intent.polarity === 'positive' && societalBenefit >= 70 && impactScores.overallPolicyRisk <= 40;
+  // 5. Explainable Recommendation derived from matrix & scores
+  const recommendation = buildContextualRecommendation(
+    profile,
+    canonicalMatrix,
+    loc,
+    gainScore,
+    frictionScore,
+    alternatives[1] || alternatives[0],
+    description
+  );
 
-  let viabilityStatus:
+  // 6. Balanced Decision Evaluation derived from canonical matrix
+  const balancedEvaluation = buildContextualBalancedEvaluation(
+    canonicalMatrix,
+    profile,
+    gainScore,
+    frictionScore,
+    loc
+  );
+
+  // 7. Validate consistency across all simulated outputs
+  const consistencyValidation = validateOutputConsistency(
+    canonicalMatrix,
+    gainScore,
+    frictionScore,
+    recommendation,
+    alternatives,
+    profile
+  );
+
+  const netViabilityScore = gainScore - frictionScore;
+  const finalDerivedPolarity: 'positive' | 'negative' | 'mixed' = balancedEvaluation.overallClassification === 'Positive'
+    ? 'positive'
+    : balancedEvaluation.overallClassification === 'Negative'
+    ? 'negative'
+    : 'mixed';
+
+  const viabilityStatus:
     | 'Highly Favorable'
     | 'Favorable with Safeguards'
     | 'Balanced Trade-off'
     | 'High Friction Precaution'
-    | 'Severely Unfavorable — High Social & Environmental Risk' = 'Favorable with Safeguards';
-  let badgeClass = 'bg-blue-100 text-blue-800 border-blue-300';
-  let viabilitySummary = '';
+    | 'Unfavorable — Net Negative Impact'
+    | 'Severely Unfavorable — High Social & Environmental Risk' =
+    balancedEvaluation.overallClassification === 'Positive'
+      ? 'Highly Favorable'
+      : balancedEvaluation.overallClassification === 'Negative'
+      ? 'Severely Unfavorable — High Social & Environmental Risk'
+      : 'Balanced Trade-off';
 
-  if (isSeverelyUnfavorable) {
-    viabilityStatus = 'Severely Unfavorable — High Social & Environmental Risk';
-    badgeClass = 'bg-rose-100 text-rose-800 border-rose-300 font-black';
-    if (archetype === 'agricultural_destruction_hazard') {
-      viabilitySummary = `Simulation identifies critical destruction of fertile agricultural lands, threat to rural food security, and acute agrarian distress (${impactScores.overallPolicyRisk}/100) with near-zero public benefit (${societalBenefit}/100). Strongly advised to immediately reject agricultural land conversion and mandate 100% preservation of cultivable corridors.`;
-    } else if (archetype === 'environmental_destruction_loss') {
-      viabilitySummary = `Simulation projects severe ecological damage, deforestation, and water/air contamination (${impactScores.overallPolicyRisk}/100) that heavily eclipses localized gains (${societalBenefit}/100). Halting execution and adopting strict conservation alternatives is mandatory.`;
-    } else if (archetype === 'displacement_relocation_industrial' || archetype === 'forced_eviction_resettlement') {
-      viabilitySummary = `Simulation identifies critical public friction, human displacement, and residential eviction risks (${impactScores.overallPolicyRisk}/100) that heavily outweigh projected gains (${societalBenefit}/100). Strongly advised to reject in current form and adopt zero-displacement alternatives.`;
-    } else {
-      viabilitySummary = `Simulation identifies critical public friction, asset degradation, or severe administrative disruption (${impactScores.overallPolicyRisk}/100) heavily surpassing negligible welfare returns (${societalBenefit}/100). Rejection or fundamental restructuring is strongly recommended.`;
-    }
-  } else if (isConditional) {
-    viabilityStatus = 'High Friction Precaution';
-    badgeClass = 'bg-amber-100 text-amber-800 border-amber-300 font-bold';
-    viabilitySummary = `Simulation indicates notable operational friction (${impactScores.overallPolicyRisk}/100) balanced with strategic output (${societalBenefit}/100). Phased citizen safeguards and strict compliance required.`;
-  } else if (isHighlyFavorable) {
-    viabilityStatus = 'Highly Favorable';
-    badgeClass = 'bg-emerald-100 text-emerald-800 border-emerald-300 font-black';
-    viabilitySummary = `Simulation indicates positive societal welfare and asset expansion (${societalBenefit}/100) substantially surpass manageable execution frictions (${impactScores.overallPolicyRisk}/100).`;
-  } else {
-    viabilityStatus = 'Balanced Trade-off';
-    badgeClass = 'bg-slate-100 text-slate-800 border-slate-300 font-medium';
-    viabilitySummary = `Balanced policy impact profile with manageable operational risks (${impactScores.overallPolicyRisk}/100) and steady welfare gain (${societalBenefit}/100).`;
-  }
-
-  // 6. Balanced Decision Evaluation (Mandatory Neutrality & Equal-Weighted Framework)
-  const balancedEvaluation = buildBalancedDecisionEvaluation(
-    description,
-    archetype,
-    policy,
-    agentAnalyses,
-    impactScores,
-    intent.polarity,
-    locationProfile,
-    locationImpactContext
-  );
-
-  let finalDerivedPolarity: 'positive' | 'negative' | 'mixed' = 'mixed';
-  if (balancedEvaluation.overallClassification === 'Negative') {
-    finalDerivedPolarity = 'negative';
-  } else if (balancedEvaluation.overallClassification === 'Positive') {
-    finalDerivedPolarity = 'positive';
-  } else {
-    finalDerivedPolarity = 'mixed';
-  }
-
-  if (finalDerivedPolarity === 'negative') {
-    viabilityStatus = 'Severely Unfavorable — High Social & Environmental Risk';
-    badgeClass = 'bg-rose-100 text-rose-800 border-rose-300 font-black';
-    viabilitySummary = balancedEvaluation.classificationRationale;
-  } else if (finalDerivedPolarity === 'positive') {
-    viabilityStatus = 'Highly Favorable';
-    badgeClass = 'bg-emerald-100 text-emerald-800 border-emerald-300 font-black';
-    viabilitySummary = balancedEvaluation.classificationRationale;
-  } else {
-    viabilityStatus = 'Balanced Trade-off';
-    badgeClass = 'bg-amber-100 text-amber-800 border-amber-300 font-bold';
-    viabilitySummary = balancedEvaluation.classificationRationale;
-  }
+  const badgeClass = balancedEvaluation.overallClassification === 'Positive'
+    ? 'bg-emerald-100 text-emerald-800 border-emerald-300 font-black'
+    : balancedEvaluation.overallClassification === 'Negative'
+    ? 'bg-rose-100 text-rose-800 border-rose-300 font-black'
+    : 'bg-amber-100 text-amber-800 border-amber-300 font-bold';
 
   const netViability = {
     status: viabilityStatus,
     badgeClass,
-    netScore: impactScores.netViabilityScore ?? (finalDerivedPolarity === 'negative' ? 12 : finalDerivedPolarity === 'positive' ? 88 : 50),
-    summary: viabilitySummary,
+    netScore: netViabilityScore,
+    summary: balancedEvaluation.classificationRationale,
+    polarity: finalDerivedPolarity,
+  };
+
+  const impactScores: ImpactScores = {
+    transport: agentAnalyses.transport?.score ?? 15,
+    infrastructure: agentAnalyses.infrastructure?.score ?? 15,
+    economic: agentAnalyses.economic?.score ?? 15,
+    environmental: agentAnalyses.environmental?.score ?? 15,
+    publicSafety: agentAnalyses.policy_compliance?.score ?? 15,
+    population: agentAnalyses.population?.score ?? 15,
+    healthcare: agentAnalyses.essential_services?.score ?? 15,
+    education: agentAnalyses.social?.score ?? 15,
+    disasterRisk: agentAnalyses.disaster_risk?.score ?? 15,
+    overallPolicyRisk: frictionScore,
+    overallSocietalBenefit: gainScore,
+    netViabilityScore,
+    gainScore,
+    gainClassification: getGainClassification(gainScore),
+    gainJustification: scoreExplanation.gainDrivers.map(d => `${d.label} (+${d.points})`).join('; ') || 'Minimal direct societal gains identified.',
+    frictionScore,
+    frictionClassification: getFrictionClassification(frictionScore),
+    frictionJustification: scoreExplanation.frictionDrivers.map(f => `${f.label} (+${f.points})`).join('; ') || 'Standard administrative oversight and routine statutory compliance.',
     polarity: finalDerivedPolarity,
   };
 
@@ -2109,13 +2125,13 @@ export function generateGenericFallbackResult(input: ScenarioInput): SimulationR
       rationale: recommendation.why,
     },
     recommendation,
-    overallScore: impactScores.frictionScore ?? impactScores.overallPolicyRisk,
-    positiveScore: impactScores.gainScore ?? impactScores.overallSocietalBenefit,
+    overallScore: frictionScore,
+    positiveScore: gainScore,
     polarity: finalDerivedPolarity,
-    gainScore: impactScores.gainScore,
+    gainScore,
     gainClassification: impactScores.gainClassification,
     gainJustification: impactScores.gainJustification,
-    frictionScore: impactScores.frictionScore,
+    frictionScore,
     frictionClassification: impactScores.frictionClassification,
     frictionJustification: impactScores.frictionJustification,
     netViability,
@@ -2123,6 +2139,9 @@ export function generateGenericFallbackResult(input: ScenarioInput): SimulationR
     locationContextAnalysis: locationProfile,
     locationImpactContext,
     proposalUnderstanding,
+    evidenceMatrix: canonicalMatrix,
+    scoreExplanation,
+    consistencyValidation,
     disclaimer: MANDATORY_DISCLAIMER,
     populationContext: (() => {
       const popMatch = description.match(/(\d+[\d,]*)\s*(families|residents|people|households|citizens|villagers)/i);

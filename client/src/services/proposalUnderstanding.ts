@@ -197,6 +197,21 @@ export function classifyProposalMeaning(
     deptLower.includes('forest') ||
     deptLower.includes('climate change');
 
+  // 12. Tourism, Hospitality & Ecotourism
+  const isTourism =
+    lower.includes('resort') ||
+    lower.includes('hotel') ||
+    lower.includes('ecotourism') ||
+    lower.includes('eco-tourism') ||
+    lower.includes('tourist') ||
+    lower.includes('tourism') ||
+    lower.includes('hospitality') ||
+    lower.includes('safari') ||
+    lower.includes('hill resort') ||
+    lower.includes('luxury resort') ||
+    lower.includes('homestay') ||
+    deptLower.includes('tourism');
+
   // Complete-Meaning Priority Resolution
   let primaryDomain: PolicyCategory = 'Municipal Administration';
   let sector = 'General Public Administration';
@@ -249,6 +264,10 @@ export function classifyProposalMeaning(
     primaryDomain = 'Housing';
     sector = 'Housing & Community Resettlement';
     confidence = 90;
+  } else if (isTourism) {
+    primaryDomain = 'Tourism / Hospitality / Economic Development';
+    sector = 'Tourism & Hospitality Infrastructure';
+    confidence = 94;
   } else if (isEnvironment) {
     primaryDomain = 'Environment';
     sector = 'Environment & Ecological Management';
@@ -515,6 +534,15 @@ function extractTargetAsset(text: string, primaryDomain: PolicyCategory): string
   if (lower.includes('hospital') || lower.includes('trauma center')) {
     return 'Multi-Specialty Government Hospital & Trauma Care Center';
   }
+  if (lower.includes('resort') || lower.includes('hotel') || lower.includes('ecotourism')) {
+    return 'Hospitality & Luxury Hill Resort Facility';
+  }
+  if (lower.includes('school') || lower.includes('higher secondary') || lower.includes('matriculation')) {
+    return 'Government Higher Secondary School Infrastructure';
+  }
+  if (lower.includes('chemical plant') || lower.includes('chemical manufacturing') || lower.includes('chemical factory')) {
+    return 'Chemical Manufacturing & Processing Plant';
+  }
   if (lower.includes('college campus') || lower.includes('university')) {
     return 'Government Higher Education College Campus';
   }
@@ -561,8 +589,11 @@ function determineResponsibleDepartment(
       return 'Industries, Investment Promotion and Commerce Department';
     case 'Healthcare':
       return 'Health and Family Welfare Department';
+    case 'Tourism / Hospitality / Economic Development':
+    case 'Tourism':
+      return 'Tourism, Culture and Religious Endowments Department';
     case 'Education':
-      return 'Higher Education Department';
+      return 'School Education Department';
     case 'Water Resources':
     case 'Water Resources / Disaster Resilience':
       return 'Water Resources Department (WRD)';
@@ -608,8 +639,11 @@ function determineLeadAdministrativeAuthority(
       return 'SIPCOT / Guidance Tamil Nadu / District Collector';
     case 'Healthcare':
       return 'Director of Medical Education & Research / Directorate of Medical and Rural Health Services';
+    case 'Tourism / Hospitality / Economic Development':
+    case 'Tourism':
+      return 'Director of Tourism / Tamil Nadu Tourism Development Corporation (TTDC) / District Collector';
     case 'Education':
-      return 'Directorate of Collegiate Education';
+      return 'Directorate of School Education / Chief Educational Officer (CEO)';
     case 'Water Resources':
     case 'Water Resources / Disaster Resilience':
       return 'Chief Engineer, Water Resources Department';
@@ -788,8 +822,10 @@ export function extractStructuredProposalUnderstanding(
   ];
   if (classification.primaryDomain === 'Governance / Public Administration') {
     positiveObjectives.push('Provide state-of-the-art administrative facilities for state legislative and executive governance.');
-  } else if (classification.primaryDomain === 'Industry / Economic Development') {
-    positiveObjectives.push('Expand industrial manufacturing and potential regional economic throughput.');
+  } else  if (classification.primaryDomain === 'Industry / Economic Development') {
+    positiveObjectives.push('Foster industrial manufacturing, regional economic growth, and supply chain output.');
+  } else if (classification.primaryDomain === 'Tourism / Hospitality / Economic Development' || classification.primaryDomain === 'Tourism') {
+    positiveObjectives.push('Boost localized hospitality infrastructure, tourist footfall, and auxiliary commercial revenue.');
   } else if (classification.primaryDomain === 'Transport Infrastructure') {
     positiveObjectives.push('Enhance arterial road transit capacity and reduce vehicular freight congestion.');
   }

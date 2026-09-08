@@ -418,11 +418,171 @@ export const DISTRICT_ENVIRONMENTAL_PROFILES: Record<string, DistrictEnvironment
     ],
     floodVulnerability: 'Moderate',
     droughtVulnerability: 'Moderate',
-    groundwaterStatus: 'Over-Exploited / Critical',
+    groundwaterStatus: 'Semi-Critical',
     applicableSpecialRegulations: [
       'Sathyamangalam Tiger Reserve Eco-Sensitive Zone regulations',
       'Zero Liquid Discharge (ZLD) mandatory for textile wet processing',
       'Kalingarayan Canal agricultural water preservation orders'
+    ]
+  },
+  'The Nilgiris': {
+    district: 'The Nilgiris',
+    majorWaterBodies: [
+      'Pykara River & Dam Lake reservoir',
+      'Avalanche Lake & Emerald Lake catchment',
+      'Bhavani River upper mountain tributaries',
+      'Ketti Valley perennial mountain stream network',
+      'Kamaraj Sagar (Sandynalla) Dam reservoir'
+    ],
+    ecologicalZones: [
+      'Western Ghats Eco-Sensitive Zone (UNESCO World Heritage Site)',
+      'Nilgiri Biosphere Reserve core buffer zone',
+      'Mudumalai Tiger Reserve & Elephant Corridor fringe'
+    ],
+    primaryLivelihoods: [
+      'Tea & coffee plantation cultivation',
+      'Highland horticulture (potato, carrot, cabbage, hill fruits)',
+      'Ecotourism, hospitality & guided nature travel'
+    ],
+    approvedIndustrialParks: [],
+    knownFarmlandBelts: [
+      'Ketti Valley terraced vegetable farming tract',
+      'Kotagiri tea plantation basin',
+      'Gudalur coffee and spices belt'
+    ],
+    highDensityResidentialZones: [
+      'Udhagamandalam (Ooty) municipal market core',
+      'Coonoor Bedford commercial & residential hub',
+      'Kotagiri town center'
+    ],
+    floodVulnerability: 'Low',
+    droughtVulnerability: 'Low',
+    groundwaterStatus: 'Safe',
+    applicableSpecialRegulations: [
+      'Hill Area Conservation Authority (HACA) mandatory clearances',
+      'Tamil Nadu District Municipalities (Hill Stations) Building Rules 1993',
+      'Forest (Conservation) Act 1980 tree felling and eco-buffer restrictions',
+      'National Green Tribunal (NGT) ban on commercial slope cutting and heavy construction in landslide hazard zones'
+    ]
+  },
+  Perambalur: {
+    district: 'Perambalur',
+    majorWaterBodies: [
+      'Vellar River southern basin',
+      'Chinnar River & local irrigation tanks (Eri)',
+      'Kottarai Dam reservoir'
+    ],
+    ecologicalZones: [
+      'Pachaimalai Hills eastern reserve forest foothills',
+      'Rural scrub and agrarian catchment'
+    ],
+    primaryLivelihoods: [
+      'Rainfed agriculture (Cotton & Maize capital of Tamil Nadu)',
+      'Smallholder dairy farming and rural trade',
+      'Limestone extraction and cement manufacturing (Chettipalayam/Alathur)'
+    ],
+    approvedIndustrialParks: [
+      'SIDCO Industrial Estate Elambalur (Perambalur)',
+      'SIPCOT Industrial Park Eraiyur'
+    ],
+    knownFarmlandBelts: [
+      'Veppanthattai cotton and maize agrarian belt',
+      'Kunnam agricultural farming tract',
+      'Alathur rainfed agricultural union'
+    ],
+    highDensityResidentialZones: [
+      'Perambalur New Bus Stand town core',
+      'Madhanagopalapuram residential ward'
+    ],
+    floodVulnerability: 'Low',
+    droughtVulnerability: 'High',
+    groundwaterStatus: 'Semi-Critical',
+    applicableSpecialRegulations: [
+      'Tamil Nadu Town & Country Planning Act civic and institutional zoning',
+      'Central Ground Water Authority (CGWA) guidelines for rainfed dry zones',
+      'Public Works Department (Buildings) statutory educational infrastructure standards'
+    ]
+  },
+  Ranipet: {
+    district: 'Ranipet',
+    majorWaterBodies: [
+      'Palar River industrial basin',
+      'Ponnai River tributary',
+      'Ranipet Big Tank & irrigation lakes'
+    ],
+    ecologicalZones: [
+      'Palar riverine riparian buffer zone',
+      'Mahimandalam scrub forest fringe'
+    ],
+    primaryLivelihoods: [
+      'Leather tanning, footwear finishing & export manufacturing',
+      'Chemical manufacturing, heavy engineering & boiler fabrication',
+      'Paddy and sugarcane farming along Palar canal tracts'
+    ],
+    approvedIndustrialParks: [
+      'SIPCOT Industrial Complex Ranipet Phase I, II & III',
+      'SIDCO Industrial Estate Ranipet',
+      'Ranipet Tannery Industrial Cluster'
+    ],
+    knownFarmlandBelts: [
+      'Walajah agricultural canal belt',
+      'Arcot agrarian farming perimeter',
+      'Nemili multi-crop agricultural union'
+    ],
+    highDensityResidentialZones: [
+      'Ranipet Town bazaar ward',
+      'Walajapet commercial core',
+      'Arcot historical urban settlement'
+    ],
+    floodVulnerability: 'Moderate',
+    droughtVulnerability: 'Moderate',
+    groundwaterStatus: 'Over-Exploited / Critical',
+    applicableSpecialRegulations: [
+      'TNPCB Strict Zero Liquid Discharge (ZLD) for tanneries and chemical units',
+      'Palar River Basin effluent discharge absolute prohibition orders',
+      'Water (Prevention & Control of Pollution) Act 1974 CTE/CTO conditions'
+    ]
+  },
+  Thiruvallur: {
+    district: 'Thiruvallur',
+    majorWaterBodies: [
+      'Chembarambakkam Lake (Primary drinking water reservoir for Chennai & Adyar River headwaters)',
+      'Poondi (Sathyamurthy Sagar) drinking reservoir',
+      'Kosasthalaiyar River basin',
+      'Pulicat Lake (Ramsar Wetland Site & Bird Sanctuary)'
+    ],
+    ecologicalZones: [
+      'Chembarambakkam Lake protected drinking water catchment buffer',
+      'Pulicat Lake Bird Sanctuary Eco-Sensitive Zone',
+      'Kosasthalaiyar flood basin'
+    ],
+    primaryLivelihoods: [
+      'Automotive, electronics & engineering manufacturing',
+      'Warehousing, logistics & port freight handling',
+      'Wetland agriculture and coastal fisheries'
+    ],
+    approvedIndustrialParks: [
+      'SIPCOT Industrial Complex Gummidipoondi',
+      'SIDCO Industrial Estate Thirumazhisai',
+      'SIPCOT Industrial Park Irungattukottai perimeter'
+    ],
+    knownFarmlandBelts: [
+      'Uthukottai fertile paddy tract',
+      'Tiruttani agrarian union',
+      'Poonamallee agricultural perimeter'
+    ],
+    highDensityResidentialZones: [
+      'Thiruvallur town core and temple perimeter',
+      'Avadi municipal corporation urban core',
+      'Poonamallee residential-transit corridor'
+    ],
+    floodVulnerability: 'High',
+    droughtVulnerability: 'Moderate',
+    groundwaterStatus: 'Over-Exploited / Critical',
+    applicableSpecialRegulations: [
+      'TNCDBR 2019 Rule 19 statutory 15-meter buffer from Chembarambakkam Lake & Poondi Reservoir',
+      'National Water Policy drinking water catchment protection protocols',
+      'CRZ 2019 Coastal Regulation Zone norms for Pulicat lagoon'
     ]
   }
 };
@@ -432,9 +592,24 @@ export function getDistrictProfile(districtName?: string): DistrictEnvironmental
   if (!districtName) return DISTRICT_ENVIRONMENTAL_PROFILES['Tiruppur'];
   const normalized = districtName.trim().toLowerCase();
   for (const [key, profile] of Object.entries(DISTRICT_ENVIRONMENTAL_PROFILES)) {
-    if (key.toLowerCase() === normalized || normalized.includes(key.toLowerCase())) {
+    const k = key.toLowerCase();
+    if (k === normalized || normalized.includes(k) || k.includes(normalized)) {
       return profile;
     }
+  }
+
+  // Common aliases
+  if (normalized.includes('nilgiri') || normalized.includes('coonoor') || normalized.includes('ooty') || normalized.includes('udhagai')) {
+    return DISTRICT_ENVIRONMENTAL_PROFILES['The Nilgiris'];
+  }
+  if (normalized.includes('chembarambakkam') || normalized.includes('thiruvallur') || normalized.includes('tiruvallur')) {
+    return DISTRICT_ENVIRONMENTAL_PROFILES['Thiruvallur'];
+  }
+  if (normalized.includes('ranipet')) {
+    return DISTRICT_ENVIRONMENTAL_PROFILES['Ranipet'];
+  }
+  if (normalized.includes('perambalur')) {
+    return DISTRICT_ENVIRONMENTAL_PROFILES['Perambalur'];
   }
 
   return {
@@ -456,7 +631,7 @@ export function getDistrictProfile(districtName?: string): DistrictEnvironmental
       `SIDCO / SIPCOT Industrial Estate ${districtName}`
     ],
     knownFarmlandBelts: [
-      `Rural taluks and agricultural unions of ${districtName}`
+      `Farmland belt of ${districtName}`
     ],
     highDensityResidentialZones: [
       `${districtName} central municipal bus stand / town core wards`
@@ -509,9 +684,22 @@ export function resolveLocationAdministrativeProfile(input: ScenarioInput): Loca
     }
   });
 
+  const STOP_WORDS = new Set([
+    'rural', 'taluk', 'taluks', 'union', 'unions', 'district', 'districts',
+    'zone', 'zones', 'area', 'areas', 'panchayat', 'panchayats', 'village',
+    'villages', 'town', 'towns', 'municipal', 'municipality', 'state', 'block',
+    'blocks', 'nagar', 'colony', 'estate', 'belt', 'tract', 'corridor',
+    'north', 'south', 'east', 'west', 'central', 'upper', 'lower',
+    'industrial', 'complex', 'phase', 'basin', 'park', 'centre', 'center',
+    'growth', 'development', 'buffer', 'fringe', 'perimeter', 'cluster'
+  ]);
+
   const isMeaningfulTokenMatch = (names: string[], district: string, text: string) => {
     return names.some(name => {
-      const tokens = name.toLowerCase().split(/[\s,()/-]+/).filter(t => t.length >= 4 && t !== district.toLowerCase());
+      const tokens = name
+        .toLowerCase()
+        .split(/[\s,()/-]+/)
+        .filter(t => t.length >= 4 && t !== district.toLowerCase() && !STOP_WORDS.has(t));
       return tokens.some(tok => text.includes(tok));
     });
   };
@@ -531,41 +719,42 @@ export function resolveLocationAdministrativeProfile(input: ScenarioInput): Loca
   const isAgriculturalOrRuralZone = 
     !isApprovedIndustrialZone && (
       locText.includes('farmland') ||
-      locText.includes('farm') ||
+      locText.includes('paddy field') ||
       locText.includes('agriculture') ||
-      locText.includes('agricultural') ||
-      locText.includes('paddy') ||
-      locText.includes('crop') ||
-      locText.includes('alluvial') ||
-      locText.includes('fertile') ||
+      locText.includes('agricultural land') ||
+      locText.includes('cultivable land') ||
+      locText.includes('fertile land') ||
+      locText.includes('crop field') ||
       isMeaningfulTokenMatch(profile.knownFarmlandBelts, profile.district, locText)
     );
 
   const isEcoSensitiveOrWaterBuffer = 
-    locText.includes('river') ||
-    locText.includes('lake') ||
-    locText.includes('dam') ||
-    locText.includes('wetland') ||
-    locText.includes('marsh') ||
-    locText.includes('canal') ||
-    locText.includes('reservoir') ||
-    locText.includes('forest') ||
-    locText.includes('sanctuary') ||
-    locText.includes('tiger reserve') ||
-    locText.includes('hills') ||
-    locText.includes('ghats') ||
-    isMeaningfulTokenMatch(profile.majorWaterBodies, profile.district, locText);
+    !isApprovedIndustrialZone && (
+      locText.includes('river') ||
+      locText.includes('lake') ||
+      locText.includes('dam') ||
+      locText.includes('wetland') ||
+      locText.includes('marsh') ||
+      locText.includes('canal') ||
+      locText.includes('reservoir') ||
+      locText.includes('forest') ||
+      locText.includes('sanctuary') ||
+      locText.includes('tiger reserve') ||
+      locText.includes('hills') ||
+      locText.includes('ghats') ||
+      isMeaningfulTokenMatch(profile.majorWaterBodies, profile.district, locText)
+    );
 
   const isHighDensityResidential = 
     !locText.includes('bypass') && !locText.includes('vacant') && (
       locText.includes('residential') ||
       locText.includes('settlement') ||
       locText.includes('colony') ||
-      locText.includes('housing') ||
-      locText.includes('apartments') ||
-      locText.includes('slum') ||
       locText.includes('bazaar') ||
-      locText.includes('congested') ||
+      locText.includes('market') ||
+      locText.includes('ward') ||
+      locText.includes('town core') ||
+      locText.includes('housing') ||
       isMeaningfulTokenMatch(profile.highDensityResidentialZones, profile.district, locText)
     );
 
@@ -573,6 +762,8 @@ export function resolveLocationAdministrativeProfile(input: ScenarioInput): Loca
   let zoningClassification: LocationAdministrativeContext['zoningClassification'] = 'Suburban Mixed / Growth Corridor';
   if (isApprovedIndustrialZone) {
     zoningClassification = 'Approved Industrial Estate (SIPCOT/SIDCO)';
+  } else if (locText.includes('hill') || locText.includes('mountain') || locText.includes('ghat') || profile.district.toLowerCase().includes('nilgiri')) {
+    zoningClassification = 'Hill & Forest Conservation Zone';
   } else if (isEcoSensitiveOrWaterBuffer) {
     zoningClassification = 'Eco-Sensitive Water Body Buffer';
   } else if (isAgriculturalOrRuralZone) {
@@ -581,8 +772,6 @@ export function resolveLocationAdministrativeProfile(input: ScenarioInput): Loca
     zoningClassification = 'Densely Populated Residential / Urban Core';
   } else if (locText.includes('coast') || locText.includes('beach') || locText.includes('crz')) {
     zoningClassification = 'Coastal CRZ Zone';
-  } else if (locText.includes('hill') || locText.includes('mountain') || locText.includes('ghat')) {
-    zoningClassification = 'Hill & Forest Conservation Zone';
   }
 
   // 3. Compute Contextual Risk Modifiers
