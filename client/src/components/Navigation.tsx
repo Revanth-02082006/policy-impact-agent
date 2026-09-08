@@ -70,14 +70,14 @@ export const Navigation: React.FC<NavigationProps> = ({ isLiveGemini }) => {
                 <div>
                   <div className="flex items-center space-x-2">
                     <span className="font-extrabold text-slate-900 text-lg tracking-tight">
-                      Policy Impact Agent
+                      Administrative Decision Impact Agent
                     </span>
                     <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black bg-blue-600 text-white tracking-wider uppercase shadow-xs">
                       V2.0
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 font-medium hidden sm:block">
-                    Government Policy Simulation Platform • Simulate Before You Decide
+                    Administrative Policy Simulation Platform • Simulate Before You Decide
                   </p>
                 </div>
               </Link>
@@ -135,8 +135,8 @@ export const Navigation: React.FC<NavigationProps> = ({ isLiveGemini }) => {
                     <ShieldCheck className="h-5 w-5" />
                   </div>
                   <div>
-                    <h2 className="font-extrabold text-slate-900 text-sm">Policy Impact Agent</h2>
-                    <p className="text-[11px] text-slate-500 font-medium">Government Decision Support</p>
+                    <h2 className="font-extrabold text-slate-900 text-sm">Administrative Decision Impact Agent</h2>
+                    <p className="text-[11px] text-slate-500 font-medium">Administrative Decision Support</p>
                   </div>
                 </div>
                 <button

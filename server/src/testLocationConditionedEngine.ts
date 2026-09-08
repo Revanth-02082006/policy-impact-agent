@@ -135,11 +135,11 @@ async function runTests() {
   console.log(`  ℹ️ Agriculture/Essential Services Evaluation in SIPCOT: ${agriEval2?.impactClassification}`);
 
   // --------------------------------------------------------------------------
-  // SCENARIO 3: Government Administrative Complex in Government Zone
+  // SCENARIO 3: Administrative Complex in Administrative Zone
   // --------------------------------------------------------------------------
-  console.log('\n--- SCENARIO 3: New Government Administrative Complex in Administrative Zone (Salem) ---');
+  console.log('\n--- SCENARIO 3: New Administrative Complex in Administrative Zone (Salem) ---');
   const input3 = {
-    description: 'Construct a new District Collectorate Administrative Complex and Integrated Master Office Building in Master Plan Government Zone',
+    description: 'Construct a new District Collectorate Administrative Complex and Integrated Master Office Building in Master Plan Administrative Zone',
     district: 'Salem',
     location: 'Salem, Tamil Nadu',
     department: 'Revenue and Disaster Management Department',

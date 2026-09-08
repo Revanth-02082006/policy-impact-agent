@@ -33,7 +33,7 @@ import {
 import { InfrastructureLookupResponse as InfrastructureLookupResult } from './api.js';
 
 export const MANDATORY_DISCLAIMER =
-  'This platform provides AI-assisted simulations for decision support only. Results are based on available information, assumptions, and heuristic reasoning. Final decisions should be made by qualified government authorities using official data and expert evaluation.';
+  'This platform provides AI-assisted simulations for decision support only. Results are based on available information, assumptions, and heuristic reasoning. Final decisions should be made by qualified administrative authorities using official data and expert evaluation.';
 
 export type PolicyArchetype =
   | 'healthcare_hospital'
@@ -1278,7 +1278,7 @@ export function buildBalancedDecisionEvaluation(
         'Barrier-free universal accessibility and modern civic public amenities for all citizens',
       ],
       negativeImpacts: [],
-      evidence: 'Centralized government administrative complex provides high social utility and equitable public access.',
+      evidence: 'Centralized administrative complex provides high social utility and equitable public access.',
     };
   } else if ((text.includes('widen') || text.includes('widening')) && (text.includes('vacant') || text.includes('bypass'))) {
     dimensions.social = {
@@ -1649,7 +1649,7 @@ export function buildBalancedDecisionEvaluation(
       positiveImpacts: [],
       negativeImpacts: [
         'Long-term generational impoverishment and marginalization of displaced families',
-        'Erosion of community trust in government administration',
+        'Erosion of community trust in administration',
       ],
       evidence: 'Involuntary eviction creates long-term social vulnerabilities and chronic poverty.',
     };
@@ -1923,7 +1923,7 @@ export function applyConditionEvaluationsToAnalyses(
 }
 
 export function generateGenericFallbackResult(input: ScenarioInput): SimulationResult {
-  const description = input.description || 'Proposed Government Administrative Policy';
+  const description = input.description || 'Proposed Administrative Policy';
 
   // STEP 1: EXTRACT STRUCTURED PROPOSAL UNDERSTANDING (Runs BEFORE everything else!)
   const proposalUnderstanding = extractStructuredProposalUnderstanding(input);
@@ -5325,12 +5325,12 @@ function buildConformingGovernmentComplexCascadingGraph(
   locationImpactContext: LocationImpactContext
 ): CascadingGraph {
   return {
-    primaryChainSummary: 'Government Complex Approved in Designated Civic Zone → Inter-Departmental Consolidation → Streamlined Citizen Service Delivery → Zero Agricultural/Ecological Disruption → High Administrative Modernization & Efficiency',
+    primaryChainSummary: 'Administrative Complex Approved in Designated Civic Zone → Inter-Departmental Consolidation → Streamlined Citizen Service Delivery → Zero Agricultural/Ecological Disruption → High Administrative Modernization & Efficiency',
     nodes: [
       {
         id: 'node_1',
         label: 'Administrative Complex Sited in Designated Civic Zone',
-        description: `Consolidated administrative complex sanctioned in conforming government zone at ${locationImpactContext.selectedLocation}.`,
+        description: `Consolidated administrative complex sanctioned in conforming administrative zone at ${locationImpactContext.selectedLocation}.`,
         cause: 'Policy decision to co-locate district/municipal offices on designated institutional land',
         effect: 'Eliminates agricultural conversion, zero residential displacement, and zero water catchment disruption.',
         severity: 'very_low',
@@ -5674,7 +5674,7 @@ function buildDisplacementAlternatives(
       ],
       disadvantages: [
         'Delays factory construction significantly for colony construction',
-        'High upfront government treasury capital outlay for housing',
+        'High upfront administrative treasury capital outlay for housing',
         'Cement dust pollution still poses health risks once plant is operational',
       ],
       mitigations: [
@@ -5752,7 +5752,7 @@ function buildAgriculturalAlternatives(
         'Accelerates project commissioning by avoiding protracted land acquisition disputes',
       ],
       disadvantages: [
-        'May require project sponsor to acquire plots within designated government industrial estates',
+        'May require project sponsor to acquire plots within designated administrative industrial estates',
       ],
       mitigations: [
         'Provide single-window clearance for priority plot allotment in notified wastelands',

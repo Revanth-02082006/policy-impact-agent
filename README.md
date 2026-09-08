@@ -1,8 +1,8 @@
-# Policy Impact Agent
+# Administrative Decision Impact Agent
 
 > **Simulate Before You Decide.**
 
-An AI-powered decision-impact simulator designed for government and municipal administrators. The system takes a proposed **blocked or damaged infrastructure asset in natural language**, analyzes how nearby people and public services may be affected across four key dimensions, identifies **cascading impact chains**, generates alternative strategies, compares those alternatives in a What-If matrix, and provides an explainable AI recommendation.
+An AI-powered decision-impact simulator designed for administrative and municipal administrators. The system takes a proposed **blocked or damaged infrastructure asset in natural language**, analyzes how nearby people and public services may be affected across four key dimensions, identifies **cascading impact chains**, generates alternative strategies, compares those alternatives in a What-If matrix, and provides an explainable AI recommendation.
 
 ---
 
@@ -10,7 +10,7 @@ An AI-powered decision-impact simulator designed for government and municipal ad
 
 Urban infrastructure decisions (such as closing a primary river bridge for maintenance) are rarely isolated to a single department. A transport closure directly impacts emergency medical response, school bus operations, disaster evacuation readiness, and vulnerable community access.
 
-**Policy Impact Agent** acts as an administrative simulation layer that visualizes these cross-department consequences *before* implementation.
+**Administrative Decision Impact Agent** acts as an administrative simulation layer that visualizes these cross-department consequences *before* implementation.
 
 ---
 
@@ -100,13 +100,13 @@ The system features automatic fallback detection:
 
 ## 7. Responsible AI & Synthetic Data Notice
 
-All city data in this prototype uses **Demo Simulation Data — Namakkal**. Infrastructure, population, traffic, impact scores, facilities, and all other figures are synthetic simulation estimates, not official Namakkal government data. They are intended exclusively for administrative decision support and do not replace official government assessments or human decision-making.
+All city data in this prototype uses **Demo Simulation Data — Namakkal**. Infrastructure, population, traffic, impact scores, facilities, and all other figures are synthetic simulation estimates, not official Namakkal administrative data. They are intended exclusively for administrative decision support and do not replace official administrative assessments or human decision-making.
 
 ## 8. Tamil Nadu Location & Map Controls
 
 The scenario form supports searchable selection across all 38 listed Tamil Nadu districts, an area or location description, and an optional infrastructure asset. Namakkal remains the default reliable demo location. District centroids are approximate navigation points only; they are not verified infrastructure data.
 
-The map separates the basemap from infrastructure context. Street imagery uses CARTO tiles. Satellite mode uses Esri World Imagery plus transparent Esri World Transportation and World Boundaries and Places reference layers for roads, place names, district boundaries, and other labels. Provider attribution is shown in the map. No satellite API key is required in the current configuration. Synthetic Namakkal assets and overlays are hidden when another district is selected, so they are not presented as real facilities or government infrastructure.
+The map separates the basemap from infrastructure context. Street imagery uses CARTO tiles. Satellite mode uses Esri World Imagery plus transparent Esri World Transportation and World Boundaries and Places reference layers for roads, place names, district boundaries, and other labels. Provider attribution is shown in the map. No satellite API key is required in the current configuration. Synthetic Namakkal assets and overlays are hidden when another district is selected, so they are not presented as real facilities or administrative infrastructure.
 
 Structured simulation requests include `location`, `district`, `area`, and `selectedAsset`. Gemini receives only the selected location context; the Namakkal synthetic dataset is included only for Namakkal demo scenarios. Other locations are clearly instructed not to infer official infrastructure data.
 

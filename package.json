@@ -2,7 +2,7 @@
   "name": "policy-impact-agent",
   "version": "1.0.0",
   "private": true,
-  "description": "Policy Impact Agent — Simulate Before You Decide",
+  "description": "Administrative Decision Impact Agent — Simulate Before You Decide",
   "scripts": {
     "setup": "npm install && cd server && npm install && cd ../client && npm install",
     "dev:server": "cd server && npm run dev",

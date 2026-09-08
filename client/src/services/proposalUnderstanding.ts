@@ -538,7 +538,7 @@ function extractTargetAsset(text: string, primaryDomain: PolicyCategory): string
 }
 
 /**
- * Determines responsible government department.
+ * Determines responsible administrative department.
  * STRICT RULE: If the exact authority or department cannot be confidently determined,
  * return "Requires Administrative Verification" rather than inventing one.
  */

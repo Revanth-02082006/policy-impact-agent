@@ -219,7 +219,7 @@ export class InfrastructureImpactAgent implements PolicySimulationAgent {
   readonly id = 'infrastructure';
   readonly name = 'Civil Infrastructure & Utilities Agent';
   readonly departmentAffinity = 'Public Works & Municipal Administration';
-  readonly description = 'Analyzes utilities, power grids, water supply, stormwater drainage, and government civil assets.';
+  readonly description = 'Analyzes utilities, power grids, water supply, stormwater drainage, and administrative civil assets.';
 
   async analyze(context: AgentExecutionContext): Promise<AgentAnalysis> {
     const evalResult = getDomainConditionEvaluation(context, 'infrastructure');

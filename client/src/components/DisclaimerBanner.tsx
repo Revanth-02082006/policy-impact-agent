@@ -11,7 +11,7 @@ export const DisclaimerBanner: React.FC<DisclaimerBannerProps> = ({
   variant = 'banner',
 }) => {
   const disclaimerText =
-    'This platform provides AI-assisted simulations for decision support only. Results are based on available information, assumptions, and heuristic reasoning. Final decisions should be made by qualified government authorities using official data and expert evaluation.';
+    'This platform provides AI-assisted simulations for decision support only. Results are based on available information, assumptions, and heuristic reasoning. Final decisions should be made by qualified administrative authorities using official data and expert evaluation.';
 
   if (variant === 'compact') {
     return (

@@ -39,7 +39,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ currentSimulation 
         <div className="relative z-10 max-w-3xl">
           <div className="inline-flex items-center space-x-2 bg-blue-950/40 border border-blue-400/30 px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider text-blue-200 mb-3">
             <ShieldAlert className="h-3.5 w-3.5 text-blue-300" />
-            <span>Government Decision-Support Layer</span>
+            <span>Administrative Decision-Support Layer</span>
           </div>
 
           <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white mb-2">

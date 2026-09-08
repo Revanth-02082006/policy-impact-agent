@@ -354,10 +354,10 @@ export const ReportPage: React.FC<ReportPageProps> = ({ simulation }) => {
             9. Responsible AI Simulation Notice & Legal Disclaimer
           </p>
           <p className="leading-relaxed max-w-3xl mx-auto">
-            {disclaimer || 'This platform provides AI-assisted simulations for decision support only. Results are based on available information, assumptions, and heuristic reasoning. Final decisions should be made by qualified government authorities using official data and expert evaluation.'}
+            {disclaimer || 'This platform provides AI-assisted simulations for decision support only. Results are based on available information, assumptions, and heuristic reasoning. Final decisions should be made by qualified administrative authorities using official data and expert evaluation.'}
           </p>
           <p className="text-slate-400 font-mono text-[10px] pt-1">
-            Policy Impact Agent V2 • Government Administrative Decision Simulator
+            Administrative Decision Impact Agent V2 • Administrative Decision Simulator
           </p>
         </section>
       </div>

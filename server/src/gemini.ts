@@ -217,7 +217,7 @@ VICINITY INVENTORY (For municipal background only):
 - Hospitals / PHCs in Area: ${infra.emergencyHospitals?.map(h => h.name).join(', ') || 'None stated in immediate vicinity'}
 - Schools / Colleges in Area: ${infra.schools?.map(s => s.name).join(', ') || 'None stated in immediate vicinity'}
 - Transit Links in Area: ${infra.transitLinks?.map(t => t.name).join(', ') || 'State Highway Corridors'}
-PROPOSED GOVERNMENT DECISION: "${input.description}"
+PROPOSED ADMINISTRATIVE DECISION: "${input.description}"
 PRE-CLASSIFIED DOMAIN HINT: "${inferredCategory}"
 SPECIFIED DEPARTMENT: "${structuredUnderstanding.responsibleDepartment}"
 DURATION / TIMELINE: "${input.duration || structuredUnderstanding.unknowns.find(u => u.includes('duration')) || 'Proposed administrative timeline'}"
@@ -228,14 +228,14 @@ YOUR RESPONSIBILITIES:
 1. POLICY UNDERSTANDING AGENT:
    Extract all 12 structured dimensions:
    - Decision Type (e.g. New Construction, Environmental Clearance, Evacuation, Relocation, Dam Discharge, Traffic Diversion)
-   - Government Department
+   - Administrative Department
    - Location
    - Affected Area
    - Duration
    - Reason
    - Scale (Local, Zonal, City-wide, District-wide, Regional, State-wide)
    - Stakeholders (list of key affected citizen and institutional groups)
-   - Infrastructure (civic and government assets involved)
+   - Infrastructure (civic and administrative assets involved)
    - Resources Required (personnel, equipment, statutory NOCs)
    - Urgency (Low, Standard, Urgent, Emergency)
    - Confidence Score (0-100)
@@ -244,14 +244,14 @@ YOUR RESPONSIBILITIES:
 
 2. MULTI-AGENT DOMAIN ANALYSIS (Execute all 9 specialized domain agents independently with strict evidence-based neutrality):
    - Transport Impact Agent (Roads, Traffic, Diversions, Travel time, Ambulance access, Public transport, Rail)
-   - Infrastructure Agent (Utilities, Roads, Bridges, Power, Water, Drainage, Telecom, Govt assets)
+   - Infrastructure Agent (Utilities, Roads, Bridges, Power, Water, Drainage, Telecom, Administrative assets)
    - Population Impact Agent (Residents, Businesses, Schools, Accessibility, Vulnerable groups, Daily life, Migration)
-   - Essential Services Agent (Hospitals, Fire, Police, Ambulance, Schools, Govt offices, Emergency response)
+   - Essential Services Agent (Hospitals, Fire, Police, Ambulance, Schools, Administrative offices, Emergency response)
    - Economic Agent (Business revenue, Employment, Logistics, Supply chains, Local trade)
    - Environmental Agent (Air quality, Water resources, Trees, Noise, Floodplain, Wetlands, Climate impact)
    - Disaster Risk Agent (Flood, Fire, Cyclone, Earthquake, Heatwave, Emergency evacuation, Resilience)
    - Social Impact Agent (Community acceptance, Safety, Livelihood, Social harmony, Quality of life)
-   - Policy Compliance Agent (Government norms, Safety principles, Administrative constraints, Basic regulations)
+   - Policy Compliance Agent (Administrative norms, Safety principles, Administrative constraints, Basic regulations)
 
    CRITICAL ANTI-HALLUCINATION & EVIDENCE RULES FOR EACH DOMAIN AGENT:
    - If a domain is NOT explicitly supported or addressed by the proposal (e.g., healthcare, education, or environmental improvements in an unrelated decision):

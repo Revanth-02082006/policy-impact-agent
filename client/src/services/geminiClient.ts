@@ -101,7 +101,7 @@ The user's proposal must be treated as the PRIMARY SOURCE OF TRUTH.
    "Minimal/No Direct Impact"
    instead of inventing a benefit. Set positiveScore to 0 and state that the domain has no direct connection to the proposal.
 
-Simulate the cross-departmental consequences of this proposed government decision:
+Simulate the cross-departmental consequences of this proposed administrative decision:
 DECISION: "${input.description}"
 LOCATION: "${locTitle}"
 DEPARTMENT: "${structuredUnderstanding.responsibleDepartment}"

@@ -72,7 +72,7 @@ export const NewSimulationPage: React.FC<{
         <div className="relative z-10 max-w-3xl">
           <div className="flex items-center space-x-2 text-xs font-extrabold uppercase tracking-widest text-blue-200 bg-blue-950/40 px-3 py-1 rounded-full w-fit mb-3 border border-blue-400/30">
             <Sparkles className="h-3.5 w-3.5" />
-            <span>AI Government Policy Simulator V2</span>
+            <span>AI Administrative Policy Simulator V2</span>
           </div>
           <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white mb-2">
             Simulate Any Administrative Decision
@@ -92,7 +92,7 @@ export const NewSimulationPage: React.FC<{
           {/* Primary Natural Language Input */}
           <div>
             <label htmlFor="policy-input" className="block text-sm font-black text-slate-900 mb-1.5">
-              Proposed Government Administrative Decision (Natural Language) *
+              Proposed Administrative Decision (Natural Language) *
             </label>
             <p className="text-xs text-slate-500 mb-2">
               Type naturally. For example: "Construct a textile factory near Tiruppur", "Relocate 500 families due to reservoir expansion", "Release excess water from Mettur Dam", "Ban heavy vehicles in the city center", or any municipal action.

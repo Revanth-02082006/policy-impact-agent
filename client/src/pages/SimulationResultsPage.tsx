@@ -68,7 +68,7 @@ export const SimulationResultsPage: React.FC<SimulationResultsPageProps> = ({
           <Activity className="h-8 w-8" />
         </div>
         <h2 className="text-xl font-bold text-slate-900">No Active Policy Simulation Results Loaded</h2>
-        <p className="text-slate-600 text-sm">Input a proposed government policy decision in natural language to generate a simulation.</p>
+        <p className="text-slate-600 text-sm">Input a proposed administrative policy decision in natural language to generate a simulation.</p>
         <Link
           to="/new-simulation"
           className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold px-5 py-2.5 rounded-xl text-sm shadow inline-flex items-center space-x-2"

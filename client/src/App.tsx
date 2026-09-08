@@ -83,7 +83,7 @@ export const App: React.FC = () => {
         <footer className="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500 no-print">
           <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
             <div>
-              <span className="font-bold text-slate-700">Policy Impact Agent</span> — Simulate Before You Decide.
+              <span className="font-bold text-slate-700">Administrative Decision Impact Agent</span> — Simulate Before You Decide.
             </div>
             <div className="text-[11px] text-slate-400">
               Live Geographic Data • Live Gemini Analysis • Built with React, TypeScript & Gemini AI

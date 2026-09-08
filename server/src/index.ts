@@ -23,7 +23,7 @@ app.get('/api/health', (req, res) => {
   const hasApiKey = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim() !== '' && !process.env.GEMINI_API_KEY.includes('your_gemini_api_key'));
   res.json({
     status: 'healthy',
-    service: 'Policy Impact Agent API',
+    service: 'Administrative Decision Impact Agent API',
     isLiveGeminiAvailable: hasApiKey,
     timestamp: new Date().toISOString()
   });
@@ -120,7 +120,7 @@ app.post('/api/simulate', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`====================================================`);
-  console.log(`🚀 Policy Impact Agent Backend Running on Port ${PORT}`);
+  console.log(`🚀 Administrative Decision Impact Agent Backend Running on Port ${PORT}`);
   console.log(`   Live Gemini API Key Present: ${Boolean(process.env.GEMINI_API_KEY)}`);
   console.log(`====================================================`);
 });
